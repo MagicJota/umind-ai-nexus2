@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { Plus } from "lucide-react";
 
 interface User {
   id: string;
@@ -20,7 +21,7 @@ interface User {
 
 const GodMode = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [users] = useState<User[]>([
+  const [users, setUsers] = useState<User[]>([
     {
       id: "1",
       name: "João Silva",
@@ -46,6 +47,7 @@ const GodMode = () => {
       createdAt: new Date("2023-09-20"),
     },
   ]);
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
 
   const handleAdminLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -73,9 +75,32 @@ const GodMode = () => {
   };
 
   const handleStatusChange = (userId: string, newStatus: "active" | "inactive") => {
+    setUsers(prev => prev.map(user => 
+      user.id === userId ? { ...user, status: newStatus } : user
+    ));
     toast({
       title: "Status atualizado",
       description: `Usuário ${newStatus === "active" ? "ativado" : "desativado"} com sucesso`,
+    });
+  };
+
+  const handleCreateUser = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const newUser: User = {
+      id: (Date.now()).toString(),
+      name: formData.get("name") as string,
+      email: formData.get("email") as string,
+      company: formData.get("company") as string,
+      status: "active",
+      createdAt: new Date(),
+    };
+    
+    setUsers(prev => [...prev, newUser]);
+    setIsCreateUserOpen(false);
+    toast({
+      title: "Usuário criado",
+      description: "Novo usuário criado com sucesso",
     });
   };
 
@@ -165,10 +190,73 @@ const GodMode = () => {
           <TabsContent value="users">
             <Card className="bg-zinc-900 border-zinc-800">
               <CardHeader>
-                <CardTitle className="text-umind-gray">Lista de Usuários</CardTitle>
-                <CardDescription className="text-umind-gray/70">
-                  Gerencie o acesso e status dos usuários do sistema
-                </CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className="text-umind-gray">Lista de Usuários</CardTitle>
+                    <CardDescription className="text-umind-gray/70">
+                      Gerencie o acesso e status dos usuários do sistema
+                    </CardDescription>
+                  </div>
+                  <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-green-600 hover:bg-green-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Criar Usuário
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-zinc-900 border-zinc-800">
+                      <DialogHeader>
+                        <DialogTitle className="text-umind-gray">Criar Novo Usuário</DialogTitle>
+                        <DialogDescription className="text-umind-gray/70">
+                          Adicione um novo usuário manualmente ao sistema
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleCreateUser} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name" className="text-umind-gray">Nome completo</Label>
+                          <Input
+                            id="name"
+                            name="name"
+                            required
+                            className="bg-zinc-800 border-zinc-700 text-umind-gray"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email" className="text-umind-gray">Email</Label>
+                          <Input
+                            id="email"
+                            name="email"
+                            type="email"
+                            required
+                            className="bg-zinc-800 border-zinc-700 text-umind-gray"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="company" className="text-umind-gray">Empresa</Label>
+                          <Input
+                            id="company"
+                            name="company"
+                            required
+                            className="bg-zinc-800 border-zinc-700 text-umind-gray"
+                          />
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setIsCreateUserOpen(false)}
+                            className="border-zinc-700 text-umind-gray"
+                          >
+                            Cancelar
+                          </Button>
+                          <Button type="submit" className="bg-green-600 hover:bg-green-700">
+                            Criar Usuário
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
