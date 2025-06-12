@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import ChatSidebar from "@/components/ChatSidebar";
 import ChatMessage from "@/components/ChatMessage";
 import FileUpload from "@/components/FileUpload";
+import VoiceRecorder from "@/components/VoiceRecorder";
 
 interface Message {
   id: string;
@@ -66,6 +67,36 @@ const Chat = () => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: responseContent,
+        role: "assistant",
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, aiMessage]);
+      setIsLoading(false);
+    }, 1000);
+  };
+
+  const handleVoiceMessage = (audioBlob: Blob) => {
+    // Convert blob to file
+    const audioFile = new File([audioBlob], "voice-message.wav", {
+      type: "audio/wav"
+    });
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: "Mensagem de voz",
+      role: "user",
+      timestamp: new Date(),
+      files: [audioFile],
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    // Simulate AI response for voice message
+    setTimeout(() => {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "Recebi sua mensagem de voz! Como assistente AI da UMIND SALES, posso processar áudios para ajudá-lo com transcrições, análises de conteúdo e muito mais. Como posso ajudá-lo especificamente?",
         role: "assistant",
         timestamp: new Date(),
       };
@@ -149,6 +180,10 @@ const Chat = () => {
                 onKeyPress={handleKeyPress}
                 placeholder="Digite sua mensagem..."
                 className="flex-1 bg-zinc-900 border-zinc-700 text-umind-gray placeholder:text-umind-gray/60"
+                disabled={isLoading}
+              />
+              <VoiceRecorder
+                onVoiceMessage={handleVoiceMessage}
                 disabled={isLoading}
               />
               <Button
