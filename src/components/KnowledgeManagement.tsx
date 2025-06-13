@@ -50,30 +50,40 @@ export function KnowledgeManagement() {
 
   const fetchKnowledgeBases = async () => {
     try {
-      const { data, error } = await supabase
+      // First, get the knowledge bases
+      const { data: kbData, error: kbError } = await supabase
         .from('knowledge_bases')
-        .select(`
-          *,
-          profiles!knowledge_bases_created_by_fkey (
-            full_name
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching knowledge bases:', error);
+      if (kbError) {
+        console.error('Error fetching knowledge bases:', kbError);
         toast({
           title: "Erro",
           description: "Erro ao carregar bases de conhecimento",
           variant: "destructive",
         });
-      } else {
-        const formattedData = data?.map(kb => ({
-          ...kb,
-          creator_name: kb.profiles?.full_name || 'Usuário desconhecido'
-        })) || [];
-        setKnowledgeBases(formattedData);
+        return;
       }
+
+      // Then get the profiles for creators
+      const creatorIds = [...new Set(kbData?.map(kb => kb.created_by) || [])];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', creatorIds);
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+      }
+
+      // Map creator names to knowledge bases
+      const formattedData = kbData?.map(kb => ({
+        ...kb,
+        creator_name: profilesData?.find(p => p.user_id === kb.created_by)?.full_name || 'Usuário desconhecido'
+      })) || [];
+
+      setKnowledgeBases(formattedData);
     } catch (error) {
       console.error('Error:', error);
     } finally {
