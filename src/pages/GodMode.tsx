@@ -339,13 +339,20 @@ const GodMode = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 bg-zinc-900 h-12">
+          <TabsList className="grid w-full grid-cols-3 mb-6 bg-zinc-900 h-12">
             <TabsTrigger 
               value="users" 
               className="data-[state=active]:bg-red-600 h-10 text-sm sm:text-base"
             >
               <Users className="w-4 h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Gerenciar </span>Usuários
+            </TabsTrigger>
+            <TabsTrigger 
+              value="knowledge" 
+              className="data-[state=active]:bg-red-600 h-10 text-sm sm:text-base"
+            >
+              <FileText className="w-4 h-4 mr-1 sm:mr-2" />
+              Conhecimento
             </TabsTrigger>
             <TabsTrigger 
               value="settings" 
@@ -442,6 +449,10 @@ const GodMode = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="knowledge">
+            <KnowledgeManagement />
           </TabsContent>
 
           <TabsContent value="settings">
