@@ -13,9 +13,19 @@ import Chat from "./pages/Chat";
 import GodMode from "./pages/GodMode";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+console.log('App: Creating QueryClient');
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App: React.FC = () => {
+  console.log('App: Component rendering');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
