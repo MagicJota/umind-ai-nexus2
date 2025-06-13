@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Menu } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import ChatSidebar from "@/components/ChatSidebar";
 import ChatMessage from "@/components/ChatMessage";
 import FileUpload from "@/components/FileUpload";
@@ -29,6 +32,8 @@ const Chat = () => {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() && selectedFiles.length === 0) return;
@@ -45,6 +50,11 @@ const Chat = () => {
     setInputValue("");
     setSelectedFiles([]);
     setIsLoading(true);
+
+    // Close sidebar on mobile when sending message
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
 
     // Simulate AI response
     setTimeout(() => {
@@ -92,6 +102,11 @@ const Chat = () => {
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
+    // Close sidebar on mobile when sending voice message
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+
     // Simulate AI response for voice message
     setTimeout(() => {
       const aiMessage: Message = {
@@ -121,36 +136,60 @@ const Chat = () => {
   };
 
   return (
-    <div className="h-screen bg-umind-black flex">
-      {/* Sidebar */}
-      <ChatSidebar />
+    <div className="h-screen bg-umind-black flex w-full">
+      {/* Mobile Sidebar with Sheet */}
+      {isMobile ? (
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="left" className="w-80 p-0 bg-zinc-950 border-zinc-800">
+            <ChatSidebar onClose={() => setSidebarOpen(false)} />
+          </SheetContent>
+        </Sheet>
+      ) : (
+        /* Desktop Sidebar */
+        <ChatSidebar />
+      )}
       
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="h-16 border-b border-zinc-800 flex items-center px-6">
-          <div className="flex items-center space-x-3">
+        <div className="h-14 md:h-16 border-b border-zinc-800 flex items-center px-4 md:px-6">
+          <div className="flex items-center space-x-3 w-full">
+            {/* Mobile hamburger menu */}
+            {isMobile && (
+              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden text-umind-gray hover:bg-zinc-800"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </Button>
+                </SheetTrigger>
+              </Sheet>
+            )}
+            
             <img 
               src="/lovable-uploads/1988c68c-7e04-415b-8f30-609f18924a6c.png" 
               alt="UMIND" 
-              className="w-8 h-8"
+              className="w-6 h-6 md:w-8 md:h-8"
             />
             <div>
-              <h1 className="text-lg font-medium text-umind-gray">UMIND SALES AI</h1>
-              <p className="text-xs text-umind-gray/60">Assistente Inteligente</p>
+              <h1 className="text-base md:text-lg font-medium text-umind-gray">UMIND SALES AI</h1>
+              <p className="text-xs text-umind-gray/60 hidden md:block">Assistente Inteligente</p>
             </div>
           </div>
         </div>
 
         {/* Messages Area */}
-        <ScrollArea className="flex-1 p-6">
-          <div className="max-w-3xl mx-auto space-y-6">
+        <ScrollArea className="flex-1 p-3 md:p-6">
+          <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
             {messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-zinc-800 rounded-2xl px-4 py-3 max-w-xs">
+                <div className="bg-zinc-800 rounded-2xl px-3 md:px-4 py-2 md:py-3 max-w-xs">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-umind-gray/60 rounded-full animate-pulse"></div>
                     <div className="w-2 h-2 bg-umind-gray/60 rounded-full animate-pulse delay-100"></div>
@@ -163,8 +202,8 @@ const Chat = () => {
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="border-t border-zinc-800 p-4">
-          <div className="max-w-3xl mx-auto space-y-4">
+        <div className="border-t border-zinc-800 p-3 md:p-4 pb-safe">
+          <div className="max-w-3xl mx-auto space-y-3 md:space-y-4">
             {/* File Upload */}
             <FileUpload
               onFileSelect={handleFileSelect}
@@ -173,13 +212,13 @@ const Chat = () => {
             />
             
             {/* Message Input */}
-            <div className="flex space-x-3">
+            <div className="flex space-x-2 md:space-x-3">
               <Input
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Digite sua mensagem..."
-                className="flex-1 bg-zinc-900 border-zinc-700 text-umind-gray placeholder:text-umind-gray/60"
+                className="flex-1 bg-zinc-900 border-zinc-700 text-umind-gray placeholder:text-umind-gray/60 h-11 md:h-10 text-base md:text-sm"
                 disabled={isLoading}
               />
               <VoiceRecorder
@@ -189,7 +228,7 @@ const Chat = () => {
               <Button
                 onClick={handleSendMessage}
                 disabled={isLoading || (!inputValue.trim() && selectedFiles.length === 0)}
-                className="bg-umind-gradient hover:opacity-90 transition-opacity"
+                className="bg-umind-gradient hover:opacity-90 transition-opacity h-11 md:h-10 px-4 md:px-6"
               >
                 Enviar
               </Button>

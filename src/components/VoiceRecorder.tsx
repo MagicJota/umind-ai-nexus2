@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { Mic, MicOff, Square } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface VoiceRecorderProps {
   onVoiceMessage: (audioBlob: Blob) => void;
@@ -15,6 +16,7 @@ const VoiceRecorder = ({ onVoiceMessage, disabled }: VoiceRecorderProps) => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isMobile = useIsMobile();
 
   const startRecording = async () => {
     try {
@@ -98,7 +100,7 @@ const VoiceRecorder = ({ onVoiceMessage, disabled }: VoiceRecorderProps) => {
           isRecording 
             ? "bg-red-500 hover:bg-red-600 text-white" 
             : "border-zinc-700 text-umind-gray hover:bg-zinc-800"
-        }`}
+        } ${isMobile ? 'h-11 w-11' : 'h-10 w-10'}`}
       >
         {isRecording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
       </Button>
