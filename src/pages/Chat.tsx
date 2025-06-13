@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,9 @@ import ChatSidebar from "@/components/ChatSidebar";
 import ChatMessage from "@/components/ChatMessage";
 import FileUpload from "@/components/FileUpload";
 import VoiceRecorder from "@/components/VoiceRecorder";
+import AISelector, { AIProvider } from "@/components/AISelector";
+import StreamButton from "@/components/StreamButton";
+import StreamInterface from "@/components/StreamInterface";
 
 interface Message {
   id: string;
@@ -18,72 +20,29 @@ interface Message {
   role: "user" | "assistant";
   timestamp: Date;
   files?: File[];
+  provider?: string;
+  model?: string;
 }
 
 const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Olá! Sou o assistente AI da UMIND SALES. Como posso ajudá-lo hoje? Você pode enviar textos, imagens, áudios, documentos ou qualquer arquivo que precise analisar.",
+      content: "Olá! Sou MAGUS, o assistente AI da UMIND SALES. Como posso ajudá-lo hoje? Você pode escolher entre ChatGPT, Claude ou Gemini, ou falar comigo ao vivo usando o modo Stream!",
       role: "assistant",
       timestamp: new Date(),
+      provider: "system"
     },
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedAI, setSelectedAI] = useState<AIProvider>('openai');
+  const [isStreamOpen, setIsStreamOpen] = useState(false);
+  const [activeKnowledgeBases, setActiveKnowledgeBases] = useState<string[]>([]);
+  const [knowledgeContext, setKnowledgeContext] = useState<string>('');
   const isMobile = useIsMobile();
-
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() && selectedFiles.length === 0) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue || "Arquivo(s) enviado(s)",
-      role: "user",
-      timestamp: new Date(),
-      files: selectedFiles.length > 0 ? [...selectedFiles] : undefined,
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue("");
-    setSelectedFiles([]);
-    setIsLoading(true);
-
-    // Close sidebar on mobile when sending message
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
-
-    // Simulate AI response
-    setTimeout(() => {
-      let responseContent = "Obrigado pela sua mensagem!";
-      
-      if (userMessage.files && userMessage.files.length > 0) {
-        const fileTypes = userMessage.files.map(file => {
-          if (file.type.startsWith('image/')) return 'imagem';
-          if (file.type.startsWith('audio/')) return 'áudio';
-          if (file.type.startsWith('video/')) return 'vídeo';
-          if (file.type.includes('pdf')) return 'documento PDF';
-          return 'documento';
-        });
-        
-        responseContent = `Recebi ${userMessage.files.length} arquivo(s): ${fileTypes.join(', ')}. Como assistente AI da UMIND SALES, posso analisar estes arquivos para ajudá-lo com suas necessidades de vendas e análise de dados. ${userMessage.content !== "Arquivo(s) enviado(s)" ? `Sobre sua mensagem: "${userMessage.content}"` : ""} Como posso ser mais específico em minha análise?`;
-      } else {
-        responseContent = "Obrigado pela sua mensagem! Como assistente AI da UMIND SALES, estou aqui para ajudá-lo com suas necessidades de vendas e análise de dados. Como posso ser mais específico em minha assistência?";
-      }
-
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: responseContent,
-        role: "assistant",
-        timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 1000);
-  };
 
   const handleVoiceMessage = (audioBlob: Blob) => {
     // Convert blob to file
@@ -135,51 +94,215 @@ const Chat = () => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const getKnowledgeContext = async (query: string) => {
+    if (activeKnowledgeBases.length === 0) return '';
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('knowledge-search', {
+        body: {
+          query,
+          knowledgeBaseIds: activeKnowledgeBases,
+          userId: 'current-user-id' // This should come from auth
+        }
+      });
+
+      if (error) {
+        console.error('Knowledge search error:', error);
+        return '';
+      }
+
+      return data?.context || '';
+    } catch (error) {
+      console.error('Error getting knowledge context:', error);
+      return '';
+    }
+  };
+
+  const callAIProvider = async (messages: Message[], context: string = '') => {
+    const functionName = `chat-${selectedAI}`;
+    
+    const { data, error } = await supabase.functions.invoke(functionName, {
+      body: {
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        knowledgeContext: context
+      }
+    });
+
+    if (error) {
+      throw new Error(error.message || 'AI provider error');
+    }
+
+    return data;
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() && selectedFiles.length === 0) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: inputValue || "Arquivo(s) enviado(s)",
+      role: "user",
+      timestamp: new Date(),
+      files: selectedFiles.length > 0 ? [...selectedFiles] : undefined,
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue("");
+    setSelectedFiles([]);
+    setIsLoading(true);
+
+    // Close sidebar on mobile when sending message
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+
+    try {
+      // Get knowledge context
+      const context = await getKnowledgeContext(userMessage.content);
+      setKnowledgeContext(context);
+
+      // Process files if any
+      if (userMessage.files && userMessage.files.length > 0) {
+        for (const file of userMessage.files) {
+          try {
+            const fileContent = await fileToBase64(file);
+            await supabase.functions.invoke('knowledge-upload', {
+              body: {
+                fileContent,
+                fileName: file.name,
+                fileType: file.type,
+                title: `Upload: ${file.name}`,
+                description: `Arquivo enviado pelo usuário: ${file.name}`,
+                userId: 'current-user-id' // This should come from auth
+              }
+            });
+          } catch (error) {
+            console.error('Error uploading file:', error);
+          }
+        }
+      }
+
+      // Call selected AI provider
+      const allMessages = [...messages, userMessage];
+      const aiResponse = await callAIProvider(allMessages, context);
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: aiResponse.message,
+        role: "assistant",
+        timestamp: new Date(),
+        provider: aiResponse.provider,
+        model: aiResponse.model
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: `Erro ao processar mensagem: ${error.message}`,
+        role: "assistant",
+        timestamp: new Date(),
+        provider: 'error'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        resolve(base64.split(',')[1]); // Remove data:type/subtype;base64, prefix
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
   return (
     <div className="h-screen bg-umind-black flex w-full">
       {/* Mobile Sidebar with Sheet */}
       {isMobile ? (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent side="left" className="w-80 p-0 bg-zinc-950 border-zinc-800">
-            <ChatSidebar onClose={() => setSidebarOpen(false)} />
+            <ChatSidebar 
+              onClose={() => setSidebarOpen(false)}
+              activeKnowledgeBases={activeKnowledgeBases}
+              onKnowledgeBasesChange={setActiveKnowledgeBases}
+            />
           </SheetContent>
         </Sheet>
       ) : (
         /* Desktop Sidebar */
-        <ChatSidebar />
+        <ChatSidebar 
+          activeKnowledgeBases={activeKnowledgeBases}
+          onKnowledgeBasesChange={setActiveKnowledgeBases}
+        />
       )}
       
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="h-14 md:h-16 border-b border-zinc-800 flex items-center px-4 md:px-6">
-          <div className="flex items-center space-x-3 w-full">
-            {/* Mobile hamburger menu */}
-            {isMobile && (
-              <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="md:hidden text-umind-gray hover:bg-zinc-800"
-                  >
-                    <Menu className="w-5 h-5" />
-                  </Button>
-                </SheetTrigger>
-              </Sheet>
-            )}
-            
-            <img 
-              src="/lovable-uploads/1988c68c-7e04-415b-8f30-609f18924a6c.png" 
-              alt="UMIND" 
-              className="w-6 h-6 md:w-8 md:h-8"
-            />
-            <div>
-              <h1 className="text-base md:text-lg font-medium text-umind-gray">UMIND SALES AI</h1>
-              <p className="text-xs text-umind-gray/60 hidden md:block">Assistente Inteligente</p>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-3">
+              {/* Mobile hamburger menu */}
+              {isMobile && (
+                <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="md:hidden text-umind-gray hover:bg-zinc-800"
+                    >
+                      <Menu className="w-5 h-5" />
+                    </Button>
+                  </SheetTrigger>
+                </Sheet>
+              )}
+              
+              <img 
+                src="/lovable-uploads/1988c68c-7e04-415b-8f30-609f18924a6c.png" 
+                alt="UMIND" 
+                className="w-6 h-6 md:w-8 md:h-8"
+              />
+              <div>
+                <h1 className="text-base md:text-lg font-medium text-umind-gray">MAGUS AI</h1>
+                <p className="text-xs text-umind-gray/60 hidden md:block">Assistente Inteligente</p>
+              </div>
+            </div>
+
+            {/* AI Selector and Stream Button */}
+            <div className="flex items-center space-x-3">
+              {!isMobile && (
+                <AISelector 
+                  selectedAI={selectedAI}
+                  onAIChange={setSelectedAI}
+                />
+              )}
+              
+              <StreamButton
+                onStreamToggle={() => setIsStreamOpen(!isStreamOpen)}
+                isStreaming={isStreamOpen}
+                disabled={isLoading}
+              />
             </div>
           </div>
         </div>
+
+        {/* Mobile AI Selector */}
+        {isMobile && (
+          <div className="p-3 border-b border-zinc-800">
+            <AISelector 
+              selectedAI={selectedAI}
+              onAIChange={setSelectedAI}
+            />
+          </div>
+        )}
 
         {/* Messages Area */}
         <ScrollArea className="flex-1 p-3 md:p-6">
@@ -236,6 +359,13 @@ const Chat = () => {
           </div>
         </div>
       </div>
+
+      {/* Stream Interface */}
+      <StreamInterface
+        isOpen={isStreamOpen}
+        onClose={() => setIsStreamOpen(false)}
+        knowledgeContext={knowledgeContext}
+      />
     </div>
   );
 };
