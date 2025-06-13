@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,162 +7,198 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Menu, Users, Settings, Eye, EyeOff } from "lucide-react";
+import { Plus, Users, Settings, LogOut } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
-interface User {
+interface UserProfile {
   id: string;
-  name: string;
+  user_id: string;
+  full_name: string;
   email: string;
-  company: string;
-  status: "active" | "inactive" | "pending";
-  createdAt: Date;
+  company: string | null;
+  role: 'ADMIN' | 'PREMIUM' | 'BASIC';
+  created_at: string;
+  updated_at: string;
 }
 
 const GodMode = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: "1",
-      name: "João Silva",
-      email: "joao@empresa.com",
-      company: "Empresa ABC",
-      status: "active",
-      createdAt: new Date("2023-10-01"),
-    },
-    {
-      id: "2",
-      name: "Maria Santos",
-      email: "maria@vendas.com",
-      company: "Vendas Corp",
-      status: "pending",
-      createdAt: new Date("2023-11-15"),
-    },
-    {
-      id: "3",
-      name: "Pedro Costa",
-      email: "pedro@startup.com",
-      company: "Startup XYZ",
-      status: "inactive",
-      createdAt: new Date("2023-09-20"),
-    },
-  ]);
+  const { profile, signOut } = useAuth();
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("users");
+  const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
 
-  const handleAdminLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching users:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao carregar usuários",
+          variant: "destructive",
+        });
+      } else {
+        setUsers(data || []);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (userId: string, newRole: 'ADMIN' | 'PREMIUM' | 'BASIC') => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole, updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+
+      if (error) {
+        toast({
+          title: "Erro",
+          description: "Erro ao atualizar usuário",
+          variant: "destructive",
+        });
+      } else {
+        setUsers(prev => prev.map(user => 
+          user.user_id === userId ? { ...user, role: newRole } : user
+        ));
+        toast({
+          title: "Usuário atualizado",
+          description: `Role alterado para ${newRole}`,
+        });
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-
-    if (
-      (email === "itsjotaerre@gmail.com" || email === "@Valdemiro2025") &&
-      password
-    ) {
-      setIsAuthenticated(true);
-      toast({
-        title: "Acesso autorizado",
-        description: "Bem-vindo ao painel administrativo",
+    const fullName = formData.get("name") as string;
+    const company = formData.get("company") as string;
+    
+    try {
+      const { error } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        user_metadata: {
+          full_name: fullName,
+          company: company
+        },
+        email_confirm: true
       });
-    } else {
+
+      if (error) {
+        toast({
+          title: "Erro",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        setIsCreateUserOpen(false);
+        fetchUsers();
+        toast({
+          title: "Usuário criado",
+          description: "Novo usuário criado com sucesso",
+        });
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
       toast({
-        title: "Acesso negado",
-        description: "Credenciais inválidas",
+        title: "Erro",
+        description: "Erro ao criar usuário",
         variant: "destructive",
       });
     }
   };
 
-  const handleStatusChange = (userId: string, newStatus: "active" | "inactive") => {
-    setUsers(prev => prev.map(user => 
-      user.id === userId ? { ...user, status: newStatus } : user
-    ));
-    toast({
-      title: "Status atualizado",
-      description: `Usuário ${newStatus === "active" ? "ativado" : "desativado"} com sucesso`,
-    });
+  const handleLogout = async () => {
+    await signOut();
   };
 
-  const handleCreateUser = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const newUser: User = {
-      id: (Date.now()).toString(),
-      name: formData.get("name") as string,
-      email: formData.get("email") as string,
-      company: formData.get("company") as string,
-      status: "active",
-      createdAt: new Date(),
-    };
-    
-    setUsers(prev => [...prev, newUser]);
-    setIsCreateUserOpen(false);
-    toast({
-      title: "Usuário criado",
-      description: "Novo usuário criado com sucesso",
-    });
-  };
-
-  const getStatusBadge = (status: User["status"]) => {
+  const getRoleBadge = (role: UserProfile["role"]) => {
     const variants = {
-      active: "bg-green-500",
-      inactive: "bg-red-500",
-      pending: "bg-yellow-500",
+      ADMIN: "bg-red-500",
+      PREMIUM: "bg-yellow-500",
+      BASIC: "bg-green-500",
     };
     
     const labels = {
-      active: "Ativo",
-      inactive: "Inativo",
-      pending: "Pendente",
+      ADMIN: "Admin",
+      PREMIUM: "Premium",
+      BASIC: "Básico",
     };
 
     return (
-      <Badge className={`${variants[status]} text-white text-xs`}>
-        {labels[status]}
+      <Badge className={`${variants[role]} text-white text-xs`}>
+        {labels[role]}
       </Badge>
     );
   };
 
-  const UserCard = ({ user }: { user: User }) => (
+  const UserCard = ({ user }: { user: UserProfile }) => (
     <Card className="bg-zinc-900 border-zinc-800 mb-3">
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-umind-gray font-medium truncate">{user.name}</h3>
+            <h3 className="text-umind-gray font-medium truncate">{user.full_name}</h3>
             <p className="text-umind-gray/70 text-sm truncate">{user.email}</p>
-            <p className="text-umind-gray/60 text-xs">{user.company}</p>
+            <p className="text-umind-gray/60 text-xs">{user.company || 'Sem empresa'}</p>
           </div>
           <div className="ml-2">
-            {getStatusBadge(user.status)}
+            {getRoleBadge(user.role)}
           </div>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-umind-gray/60 text-xs">
-            {user.createdAt.toLocaleDateString("pt-BR")}
+            {new Date(user.created_at).toLocaleDateString("pt-BR")}
           </span>
           <div className="flex space-x-2">
-            {user.status !== "active" && (
+            {user.role !== "ADMIN" && (
+              <Button
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-xs h-8 px-3"
+                onClick={() => handleStatusChange(user.user_id, "ADMIN")}
+              >
+                Admin
+              </Button>
+            )}
+            {user.role !== "PREMIUM" && (
+              <Button
+                size="sm"
+                className="bg-yellow-600 hover:bg-yellow-700 text-xs h-8 px-3"
+                onClick={() => handleStatusChange(user.user_id, "PREMIUM")}
+              >
+                Premium
+              </Button>
+            )}
+            {user.role !== "BASIC" && (
               <Button
                 size="sm"
                 className="bg-green-600 hover:bg-green-700 text-xs h-8 px-3"
-                onClick={() => handleStatusChange(user.id, "active")}
+                onClick={() => handleStatusChange(user.user_id, "BASIC")}
               >
-                Ativar
-              </Button>
-            )}
-            {user.status === "active" && (
-              <Button
-                size="sm"
-                variant="destructive"
-                className="text-xs h-8 px-3"
-                onClick={() => handleStatusChange(user.id, "inactive")}
-              >
-                Desativar
+                Básico
               </Button>
             )}
           </div>
@@ -208,11 +244,20 @@ const GodMode = () => {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="password" className="text-umind-gray">Senha</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className="bg-zinc-800 border-zinc-700 text-umind-gray h-12 text-base"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="company" className="text-umind-gray">Empresa</Label>
               <Input
                 id="company"
                 name="company"
-                required
                 className="bg-zinc-800 border-zinc-700 text-umind-gray h-12 text-base"
               />
             </div>
@@ -238,47 +283,10 @@ const GodMode = () => {
     );
   };
 
-  if (!isAuthenticated) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-umind-black flex items-center justify-center p-4 sm:p-6">
-        <Card className="w-full max-w-md bg-zinc-900 border-zinc-800">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl text-red-500">⚠️ GOD MODE</CardTitle>
-            <CardDescription className="text-umind-gray/70">
-              Acesso restrito a administradores
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAdminLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-umind-gray">Email do Administrador</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  className="bg-zinc-800 border-zinc-700 text-umind-gray h-12 text-base"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-umind-gray">Senha</Label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  className="bg-zinc-800 border-zinc-700 text-umind-gray h-12 text-base"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full bg-red-600 hover:bg-red-700 text-white h-12"
-              >
-                Acessar Painel
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-umind-black flex items-center justify-center">
+        <div className="text-umind-gray">Carregando...</div>
       </div>
     );
   }
@@ -290,23 +298,44 @@ const GodMode = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-red-500">🔐 GOD MODE</h1>
-            <p className="text-umind-gray/70 text-sm">Painel administrativo</p>
+            <p className="text-umind-gray/70 text-sm">Bem-vindo, {profile?.full_name}</p>
           </div>
-          <Button
-            onClick={() => setIsCreateUserOpen(true)}
-            className="bg-green-600 hover:bg-green-700 h-10 px-3"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Novo
-          </Button>
+          <div className="flex space-x-2">
+            <Button
+              onClick={() => setIsCreateUserOpen(true)}
+              className="bg-green-600 hover:bg-green-700 h-10 px-3"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Novo
+            </Button>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              className="border-zinc-700 text-umind-gray h-10 px-3"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
       <div className="p-4 sm:p-6 lg:max-w-6xl lg:mx-auto">
         {/* Desktop Header */}
         <div className="hidden lg:block mb-8">
-          <h1 className="text-3xl font-bold text-red-500 mb-2">🔐 GOD MODE</h1>
-          <p className="text-umind-gray/70">Painel de administração do sistema</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-red-500 mb-2">🔐 GOD MODE</h1>
+              <p className="text-umind-gray/70">Bem-vindo, {profile?.full_name} - Painel de administração</p>
+            </div>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              className="border-zinc-700 text-umind-gray"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sair
+            </Button>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -332,9 +361,9 @@ const GodMode = () => {
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                   <div>
-                    <CardTitle className="text-umind-gray">Lista de Usuários</CardTitle>
+                    <CardTitle className="text-umind-gray">Lista de Usuários ({users.length})</CardTitle>
                     <CardDescription className="text-umind-gray/70">
-                      Gerencie o acesso e status dos usuários
+                      Gerencie roles e acesso dos usuários
                     </CardDescription>
                   </div>
                   <Button 
@@ -362,7 +391,7 @@ const GodMode = () => {
                         <TableHead className="text-umind-gray">Nome</TableHead>
                         <TableHead className="text-umind-gray">Email</TableHead>
                         <TableHead className="text-umind-gray">Empresa</TableHead>
-                        <TableHead className="text-umind-gray">Status</TableHead>
+                        <TableHead className="text-umind-gray">Role</TableHead>
                         <TableHead className="text-umind-gray">Criado em</TableHead>
                         <TableHead className="text-umind-gray">Ações</TableHead>
                       </TableRow>
@@ -370,30 +399,39 @@ const GodMode = () => {
                     <TableBody>
                       {users.map((user) => (
                         <TableRow key={user.id} className="border-zinc-700">
-                          <TableCell className="text-umind-gray">{user.name}</TableCell>
+                          <TableCell className="text-umind-gray">{user.full_name}</TableCell>
                           <TableCell className="text-umind-gray">{user.email}</TableCell>
-                          <TableCell className="text-umind-gray">{user.company}</TableCell>
-                          <TableCell>{getStatusBadge(user.status)}</TableCell>
+                          <TableCell className="text-umind-gray">{user.company || 'Sem empresa'}</TableCell>
+                          <TableCell>{getRoleBadge(user.role)}</TableCell>
                           <TableCell className="text-umind-gray">
-                            {user.createdAt.toLocaleDateString("pt-BR")}
+                            {new Date(user.created_at).toLocaleDateString("pt-BR")}
                           </TableCell>
                           <TableCell className="space-x-2">
-                            {user.status !== "active" && (
+                            {user.role !== "ADMIN" && (
+                              <Button
+                                size="sm"
+                                className="bg-red-600 hover:bg-red-700"
+                                onClick={() => handleStatusChange(user.user_id, "ADMIN")}
+                              >
+                                Admin
+                              </Button>
+                            )}
+                            {user.role !== "PREMIUM" && (
+                              <Button
+                                size="sm"
+                                className="bg-yellow-600 hover:bg-yellow-700"
+                                onClick={() => handleStatusChange(user.user_id, "PREMIUM")}
+                              >
+                                Premium
+                              </Button>
+                            )}
+                            {user.role !== "BASIC" && (
                               <Button
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700"
-                                onClick={() => handleStatusChange(user.id, "active")}
+                                onClick={() => handleStatusChange(user.user_id, "BASIC")}
                               >
-                                Ativar
-                              </Button>
-                            )}
-                            {user.status === "active" && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleStatusChange(user.id, "inactive")}
-                              >
-                                Desativar
+                                Básico
                               </Button>
                             )}
                           </TableCell>

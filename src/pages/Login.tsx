@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,26 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signIn, signUp, user, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      navigate("/chat");
+    }
+  }, [user, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-umind-black flex items-center justify-center">
+        <div className="text-umind-gray">Carregando...</div>
+      </div>
+    );
+  }
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -20,29 +36,59 @@ const Login = () => {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signIn(email, password);
+    
+    setIsLoading(false);
+    
+    if (error) {
+      toast({
+        title: "Erro no login",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Login realizado com sucesso!",
         description: "Redirecionando para o chat...",
       });
       navigate("/chat");
-    }, 1000);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate registration submission (no account creation)
-    setTimeout(() => {
-      setIsLoading(false);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const fullName = formData.get("fullName") as string;
+    const company = formData.get("company") as string;
+
+    const { error } = await signUp(email, password, fullName, company);
+    
+    setIsLoading(false);
+    
+    if (error) {
+      if (error.message.includes('already registered')) {
+        toast({
+          title: "Usuário já existe",
+          description: "Este email já está registrado. Tente fazer login.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro no registro",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    } else {
       toast({
-        title: "Solicitação de registro enviada",
-        description: "Sua conta será ativada por um administrador em breve.",
+        title: "Registro realizado!",
+        description: "Verifique seu email para confirmar a conta.",
       });
-    }, 1000);
+    }
   };
 
   return (
@@ -123,7 +169,7 @@ const Login = () => {
                 <CardHeader className="text-center">
                   <CardTitle className="text-2xl text-umind-gray">Criar conta</CardTitle>
                   <CardDescription className="text-umind-gray/70">
-                    Solicite acesso ao assistente AI da UMIND
+                    Crie sua conta para acessar o assistente AI
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -156,18 +202,18 @@ const Login = () => {
                         id="registerPassword"
                         name="password"
                         type="password"
+                        placeholder="Mínimo 6 caracteres"
                         required
                         className="bg-zinc-800 border-zinc-700 text-umind-gray"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="company" className="text-umind-gray">Empresa</Label>
+                      <Label htmlFor="company" className="text-umind-gray">Empresa (opcional)</Label>
                       <Input
                         id="company"
                         name="company"
                         type="text"
                         placeholder="Nome da sua empresa"
-                        required
                         className="bg-zinc-800 border-zinc-700 text-umind-gray"
                       />
                     </div>
@@ -176,11 +222,11 @@ const Login = () => {
                       className="w-full bg-umind-gradient hover:opacity-90 transition-opacity"
                       disabled={isLoading}
                     >
-                      {isLoading ? "Enviando..." : "Solicitar acesso"}
+                      {isLoading ? "Criando conta..." : "Criar conta"}
                     </Button>
                   </form>
                   <p className="text-xs text-umind-gray/60 mt-4 text-center">
-                    Sua conta será ativada por um administrador após a revisão
+                    Você receberá um email de confirmação
                   </p>
                 </CardContent>
               </Card>
