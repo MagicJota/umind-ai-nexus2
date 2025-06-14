@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 
 // Properly declare the SpeechRecognition interface
 interface SpeechRecognitionEvent extends Event {
