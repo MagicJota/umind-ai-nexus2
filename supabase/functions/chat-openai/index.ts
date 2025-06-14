@@ -31,7 +31,7 @@ serve(async (req) => {
     // Prepare system message with knowledge context
     const systemMessage = {
       role: 'system',
-      content: `Você é MAGUS, um assistente AI inteligente da UMIND SALES. Seja natural, direto e útil. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`
+      content: `Você é MAGUS, uma inteligência artificial avançada da UMIND SALES. Seja natural, direto e útil em todas as suas capacidades. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`
     };
 
     console.log('Calling OpenAI API...');
@@ -42,7 +42,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [systemMessage, ...messages],
         temperature: 0.7,
         max_tokens: 1000,
@@ -59,7 +59,7 @@ serve(async (req) => {
 
     const result = {
       message: data.choices[0].message.content,
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-2025-04-14',
       provider: 'openai'
     };
 

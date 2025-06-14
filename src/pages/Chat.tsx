@@ -1,9 +1,8 @@
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -30,7 +29,7 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Olá! Sou MAGUS, o assistente AI da UMIND SALES. Como posso ajudá-lo hoje? Você pode escolher entre ChatGPT, Claude ou Gemini, ou falar comigo ao vivo usando o modo Stream!",
+      content: "Olá! Sou MAGUS, uma inteligência artificial avançada da UMIND SALES. Como posso ajudá-lo hoje? Você pode escolher entre Chat, Think ou Code, ou falar comigo ao vivo usando o modo Stream!",
       role: "assistant",
       timestamp: new Date(),
       provider: "system"
@@ -44,7 +43,13 @@ const Chat = () => {
   const [isStreamOpen, setIsStreamOpen] = useState(false);
   const [activeKnowledgeBases, setActiveKnowledgeBases] = useState<string[]>([]);
   const [knowledgeContext, setKnowledgeContext] = useState<string>('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+
+  // Auto-scroll para a última mensagem
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const handleVoiceMessage = (audioBlob: Blob) => {
     // Convert blob to file
@@ -72,7 +77,7 @@ const Chat = () => {
     setTimeout(() => {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "Recebi sua mensagem de voz! Como assistente AI da UMIND SALES, posso processar áudios para ajudá-lo com transcrições, análises de conteúdo e muito mais. Como posso ajudá-lo especificamente?",
+        content: "Recebi sua mensagem de voz! Como MAGUS, posso processar áudios para ajudá-lo com transcrições, análises de conteúdo e muito mais. Como posso ajudá-lo especificamente?",
         role: "assistant",
         timestamp: new Date(),
       };
@@ -120,8 +125,9 @@ const Chat = () => {
     }
   };
 
-  const callAIProvider = async (messages: Message[], context: string = '') => {
-    const functionName = `chat-${selectedAI}`;
+  const callAIProvider = async (messages: Message[], context: string = '', forceProvider?: AIProvider) => {
+    const providerToUse = forceProvider || selectedAI;
+    const functionName = `chat-${providerToUse}`;
     console.log(`Calling ${functionName} with context:`, !!context);
     
     try {
@@ -134,7 +140,7 @@ const Chat = () => {
 
       if (error) {
         console.error(`Error calling ${functionName}:`, error);
-        throw new Error(error.message || `Erro na API ${selectedAI}`);
+        throw new Error(error.message || `Erro na API ${providerToUse}`);
       }
 
       if (!data) {
@@ -196,7 +202,7 @@ const Chat = () => {
         }
       }
 
-      // Call selected AI provider
+      // Call selected AI provider with full message history for context
       const allMessages = [...messages, userMessage];
       const aiResponse = await callAIProvider(allMessages, context);
 
@@ -243,6 +249,10 @@ const Chat = () => {
       };
       reader.onerror = error => reject(error);
     });
+  };
+
+  const handleStreamToggle = () => {
+    setIsStreamOpen(!isStreamOpen);
   };
 
   return (
@@ -325,6 +335,7 @@ const Chat = () => {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
 
@@ -353,7 +364,7 @@ const Chat = () => {
                 disabled={isLoading}
               />
               <StreamButton
-                onStreamToggle={() => setIsStreamOpen(!isStreamOpen)}
+                onStreamToggle={handleStreamToggle}
                 isStreaming={isStreamOpen}
                 disabled={isLoading}
               />
@@ -369,11 +380,12 @@ const Chat = () => {
         </div>
       </div>
 
-      {/* Stream Interface */}
+      {/* Stream Interface - usa automaticamente Google e passa o contexto completo */}
       <StreamInterface
         isOpen={isStreamOpen}
         onClose={() => setIsStreamOpen(false)}
         knowledgeContext={knowledgeContext}
+        messages={messages}
       />
     </div>
   );

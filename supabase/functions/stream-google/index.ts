@@ -39,7 +39,7 @@ serve(async (req) => {
         }
         
         // Prepare system prompt
-        const systemPrompt = `Você é MAGUS, um assistente AI inteligente da UMIND SALES que conversa ao vivo com o usuário. Seja natural, direto e útil. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
+        const systemPrompt = `Você é MAGUS, uma inteligência artificial avançada da UMIND SALES. Seja natural, direto e útil em todas as suas capacidades. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
 
         console.log('Calling Google Streaming API...');
 

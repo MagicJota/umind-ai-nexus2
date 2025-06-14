@@ -28,7 +28,7 @@ serve(async (req) => {
     }
 
     // Convert messages format for Claude
-    const systemPrompt = `Você é MAGUS, um assistente AI inteligente da UMIND SALES. Seja natural, direto e útil. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
+    const systemPrompt = `Você é MAGUS, uma inteligência artificial avançada da UMIND SALES. Seja natural, direto e útil em todas as suas capacidades. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
     
     const claudeMessages = messages.map((msg: any) => ({
       role: msg.role === 'assistant' ? 'assistant' : 'user',
@@ -44,7 +44,7 @@ serve(async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-opus-4-20250514',
         system: systemPrompt,
         messages: claudeMessages,
         max_tokens: 1000,
@@ -53,15 +53,16 @@ serve(async (req) => {
 
     const data = await response.json();
     console.log('Claude Response status:', response.status);
+    console.log('Claude Response data:', data);
     
     if (!response.ok) {
       console.error('Claude API error:', data);
-      throw new Error(data.error?.message || 'Claude API error');
+      throw new Error(data.error?.message || `Claude API error: ${response.status}`);
     }
 
     const result = {
       message: data.content[0].text,
-      model: 'claude-3-haiku',
+      model: 'claude-opus-4',
       provider: 'claude'
     };
 

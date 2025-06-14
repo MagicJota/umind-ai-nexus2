@@ -1,9 +1,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Zap, Brain, ChevronDown } from "lucide-react";
+import { MessageCircle, Brain, Code, ChevronDown } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export type AIProvider = 'openai' | 'claude' | 'google';
@@ -16,27 +15,27 @@ interface AISelectorProps {
 const aiOptions = [
   {
     id: 'openai' as AIProvider,
-    name: 'ChatGPT',
-    description: 'GPT-4o Mini - Rápido e versátil',
-    icon: Bot,
+    name: 'Chat',
+    description: 'Para conversas rápidas e respostas ágeis',
+    icon: MessageCircle,
     color: 'bg-green-500',
-    badge: 'Padrão'
+    badge: 'Rápido'
   },
   {
     id: 'claude' as AIProvider,
-    name: 'Claude',
-    description: 'Claude 3 Haiku - Analítico e preciso',
+    name: 'Think',
+    description: 'Para análises profundas e raciocínio complexo',
     icon: Brain,
-    color: 'bg-orange-500',
+    color: 'bg-purple-500',
     badge: 'Avançado'
   },
   {
     id: 'google' as AIProvider,
-    name: 'Gemini',
-    description: 'Gemini 1.5 Flash - Para texto e Stream',
-    icon: Zap,
+    name: 'Code',
+    description: 'Para programação e desenvolvimento',
+    icon: Code,
     color: 'bg-blue-500',
-    badge: 'Stream'
+    badge: 'Dev'
   }
 ];
 

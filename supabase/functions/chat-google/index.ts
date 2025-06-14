@@ -34,7 +34,7 @@ serve(async (req) => {
     }));
 
     // Add system instruction through the first message
-    const systemPrompt = `Você é MAGUS, um assistente AI inteligente da UMIND SALES. Seja natural, direto e útil. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
+    const systemPrompt = `Você é MAGUS, uma inteligência artificial avançada da UMIND SALES. Seja natural, direto e útil em todas as suas capacidades. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
     
     if (contents.length > 0) {
       contents[0].parts[0].text = `${systemPrompt}\n\nUsuário: ${contents[0].parts[0].text}`;
