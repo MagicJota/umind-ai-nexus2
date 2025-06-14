@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,9 +56,8 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
   const [currentMessage, setCurrentMessage] = useState("");
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   
-  const wsRef = useRef<WebSocket | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const synthRef = useRef<SpeechSynthesis | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -110,11 +110,6 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
         throw new Error('Speech recognition não suportado neste navegador');
       }
 
-      // Initialize Speech Synthesis
-      synthRef.current = window.speechSynthesis;
-
-      // Use HTTP-based streaming instead of direct WebSocket
-      console.log('Initializing HTTP-based streaming...');
       setIsConnected(true);
       setConnectionStatus('connected');
       toast({
@@ -152,10 +147,9 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
       }
 
       setCurrentMessage(data.message);
-      setIsSpeaking(false);
       
       if (data.message) {
-        speakText(data.message);
+        await speakTextWithGoogleTTS(data.message);
       }
 
     } catch (error) {
@@ -167,6 +161,87 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
         variant: "destructive",
       });
     }
+  };
+
+  const speakTextWithGoogleTTS = async (text: string) => {
+    try {
+      // Stop any current audio
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
+
+      // Call Google Text-to-Speech via Supabase function
+      const { data, error } = await supabase.functions.invoke('text-to-speech-google', {
+        body: {
+          text: text,
+          voice: 'pt-BR-Standard-A', // Brazilian Portuguese voice
+          languageCode: 'pt-BR'
+        }
+      });
+
+      if (error) {
+        console.error('TTS Error:', error);
+        // Fallback to browser speech synthesis
+        fallbackToWebSpeech(text);
+        return;
+      }
+
+      if (data.audioContent) {
+        // Convert base64 to audio and play
+        const audioBlob = base64ToBlob(data.audioContent, 'audio/mp3');
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        const audio = new Audio(audioUrl);
+        currentAudioRef.current = audio;
+        
+        audio.onended = () => {
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+          currentAudioRef.current = null;
+        };
+        
+        audio.onerror = () => {
+          console.error('Audio playback error');
+          setIsSpeaking(false);
+          URL.revokeObjectURL(audioUrl);
+          currentAudioRef.current = null;
+          // Fallback to browser speech synthesis
+          fallbackToWebSpeech(text);
+        };
+        
+        await audio.play();
+      } else {
+        fallbackToWebSpeech(text);
+      }
+
+    } catch (error) {
+      console.error('Error with Google TTS:', error);
+      fallbackToWebSpeech(text);
+    }
+  };
+
+  const fallbackToWebSpeech = (text: string) => {
+    if (window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.onend = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setIsSpeaking(false);
+    }
+  };
+
+  const base64ToBlob = (base64: string, contentType: string) => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: contentType });
   };
 
   const toggleListening = async () => {
@@ -198,32 +273,27 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
     }
   };
 
-  const speakText = (text: string) => {
-    if (synthRef.current) {
-      synthRef.current.cancel(); // Stop any current speech
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'pt-BR';
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      synthRef.current.speak(utterance);
-    }
-  };
-
   const stopSpeaking = () => {
-    if (synthRef.current) {
-      synthRef.current.cancel();
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
     }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
   };
 
   const cleanup = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-    }
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
-    if (synthRef.current) {
-      synthRef.current.cancel();
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
     }
     setIsConnected(false);
     setIsListening(false);
