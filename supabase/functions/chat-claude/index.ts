@@ -35,7 +35,7 @@ serve(async (req) => {
       content: msg.content
     }));
 
-    console.log('Calling Claude API...');
+    console.log('Calling Claude API with model claude-3-5-sonnet-20241022...');
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -44,29 +44,45 @@ serve(async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         system: systemPrompt,
         messages: claudeMessages,
         max_tokens: 1000,
       }),
     });
 
-    const data = await response.json();
     console.log('Claude Response status:', response.status);
-    console.log('Claude Response data:', data);
     
     if (!response.ok) {
-      console.error('Claude API error:', data);
-      throw new Error(data.error?.message || `Claude API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('Claude API error response:', errorText);
+      
+      // Parse error if it's JSON
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: { message: errorText } };
+      }
+      
+      throw new Error(errorData.error?.message || `Claude API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('Claude Response data received successfully');
+    
+    if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
+      console.error('Invalid response structure from Claude:', data);
+      throw new Error('Invalid response structure from Claude API');
     }
 
     const result = {
       message: data.content[0].text,
-      model: 'claude-opus-4',
+      model: 'claude-3-5-sonnet-20241022',
       provider: 'claude'
     };
 
-    console.log('Returning successful response');
+    console.log('Returning successful Claude response');
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
