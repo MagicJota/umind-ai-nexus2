@@ -6,205 +6,75 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
-      knowledge_access_logs: {
+      messages: {
         Row: {
-          action: string
-          created_at: string
           id: string
-          knowledge_base_id: string
-          metadata: Json | null
+          content: string
+          role: 'user' | 'assistant'
+          timestamp: string
+          provider: string
+          model: string | null
           user_id: string
+          created_at: string
         }
         Insert: {
-          action: string
-          created_at?: string
           id?: string
-          knowledge_base_id: string
-          metadata?: Json | null
+          content: string
+          role: 'user' | 'assistant'
+          timestamp?: string
+          provider: string
+          model?: string | null
           user_id: string
+          created_at?: string
         }
         Update: {
-          action?: string
-          created_at?: string
           id?: string
-          knowledge_base_id?: string
-          metadata?: Json | null
+          content?: string
+          role?: 'user' | 'assistant'
+          timestamp?: string
+          provider?: string
+          model?: string | null
           user_id?: string
+          created_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "knowledge_access_logs_knowledge_base_id_fkey"
-            columns: ["knowledge_base_id"]
-            isOneToOne: false
-            referencedRelation: "knowledge_bases"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       knowledge_bases: {
         Row: {
-          content: string | null
-          created_at: string
-          created_by: string
+          id: string
+          name: string
           description: string | null
-          file_name: string | null
-          file_path: string | null
-          file_size: number | null
-          file_type: string | null
-          id: string
-          is_public: boolean
-          status: Database["public"]["Enums"]["knowledge_status"]
-          tags: string[] | null
-          title: string
-          type: Database["public"]["Enums"]["knowledge_type"]
-          updated_at: string
-          version: number
-        }
-        Insert: {
-          content?: string | null
-          created_at?: string
-          created_by: string
-          description?: string | null
-          file_name?: string | null
-          file_path?: string | null
-          file_size?: number | null
-          file_type?: string | null
-          id?: string
-          is_public?: boolean
-          status?: Database["public"]["Enums"]["knowledge_status"]
-          tags?: string[] | null
-          title: string
-          type?: Database["public"]["Enums"]["knowledge_type"]
-          updated_at?: string
-          version?: number
-        }
-        Update: {
-          content?: string | null
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          file_name?: string | null
-          file_path?: string | null
-          file_size?: number | null
-          file_type?: string | null
-          id?: string
-          is_public?: boolean
-          status?: Database["public"]["Enums"]["knowledge_status"]
-          tags?: string[] | null
-          title?: string
-          type?: Database["public"]["Enums"]["knowledge_type"]
-          updated_at?: string
-          version?: number
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          company: string | null
+          user_id: string
           created_at: string
-          email: string
-          full_name: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
           updated_at: string
-          user_id: string
         }
         Insert: {
-          company?: string | null
-          created_at?: string
-          email: string
-          full_name: string
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          updated_at?: string
+          name: string
+          description?: string | null
           user_id: string
+          created_at?: string
+          updated_at?: string
         }
         Update: {
-          company?: string | null
+          id?: string
+          name?: string
+          description?: string | null
+          user_id?: string
           created_at?: string
-          email?: string
-          full_name?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
-          user_id?: string
         }
-        Relationships: []
-      }
-      user_knowledge_access: {
-        Row: {
-          granted_at: string
-          granted_by: string
-          id: string
-          knowledge_base_id: string
-          user_id: string
-        }
-        Insert: {
-          granted_at?: string
-          granted_by: string
-          id?: string
-          knowledge_base_id: string
-          user_id: string
-        }
-        Update: {
-          granted_at?: string
-          granted_by?: string
-          id?: string
-          knowledge_base_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_knowledge_access_knowledge_base_id_fkey"
-            columns: ["knowledge_base_id"]
-            isOneToOne: false
-            referencedRelation: "knowledge_bases"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: Database["public"]["Enums"]["app_role"]
-      }
-      get_user_role: {
-        Args: { _user_id: string }
-        Returns: Database["public"]["Enums"]["app_role"]
-      }
-      has_role: {
-        Args: {
-          _user_id: string
-          _role: Database["public"]["Enums"]["app_role"]
-        }
-        Returns: boolean
-      }
-      is_current_user_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      user_can_manage_knowledge: {
-        Args: { u_id: string }
-        Returns: boolean
-      }
-      user_has_knowledge_access: {
-        Args: { kb_id: string; u_id: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
-      app_role: "ADMIN" | "PREMIUM" | "BASIC"
-      knowledge_status: "ACTIVE" | "INACTIVE" | "DRAFT" | "ARCHIVED"
-      knowledge_type: "DOCUMENT" | "FAQ" | "MANUAL" | "TRAINING" | "REFERENCE"
-    }
-    CompositeTypes: {
       [_ in never]: never
     }
   }

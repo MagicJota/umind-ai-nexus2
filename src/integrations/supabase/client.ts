@@ -2,10 +2,39 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://citcshcehztpbumkvywz.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpdGNzaGNlaHp0cGJ1bWt2eXd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk3NjQzNzksImV4cCI6MjA2NTM0MDM3OX0.Doz0Hm-hbTZOgAyDR9s1JSnWmKuAZvlkIYwIsfpzXq8";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Supabase URL and Anon Key são necessários. Verifique suas variáveis de ambiente.');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
+});
+
+// Função auxiliar para lidar com erros do Supabase
+export const handleSupabaseError = (error: any) => {
+  console.error('Erro Supabase:', error);
+  
+  if (error.code === 'PGRST301') {
+    return 'Erro de autenticação. Por favor, faça login novamente.';
+  }
+  
+  if (error.code === 'PGRST116') {
+    return 'Erro de permissão. Você não tem acesso a este recurso.';
+  }
+  
+  return error.message || 'Ocorreu um erro inesperado.';
+};

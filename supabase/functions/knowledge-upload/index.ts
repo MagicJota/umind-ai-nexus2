@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
@@ -14,6 +13,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log('Received knowledge upload request');
     const { fileContent, fileName, fileType, title, description, userId } = await req.json();
     console.log('Knowledge upload request:', { fileName, fileType, title, userId });
 
@@ -21,6 +21,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     let extractedContent = fileContent;
@@ -32,12 +36,14 @@ serve(async (req) => {
       if (openaiApiKey) {
         extractedContent = await extractTextFromImage(fileContent, openaiApiKey);
       } else {
-        extractedContent = 'Imagem carregada - OCR não disponível sem API OpenAI';
+        throw new Error('OpenAI API key not configured for image processing');
       }
     } else if (fileType.includes('text/') || fileType.includes('json')) {
       // Text files are already in the right format
       extractedContent = fileContent;
     }
+
+    console.log('Content extracted, creating knowledge base entry');
 
     // Create knowledge base entry
     const { data, error } = await supabase
@@ -58,8 +64,11 @@ serve(async (req) => {
       .single();
 
     if (error) {
+      console.error('Database error:', error);
       throw new Error(`Database error: ${error.message}`);
     }
+
+    console.log('Knowledge base entry created successfully');
 
     return new Response(JSON.stringify({
       success: true,
@@ -89,12 +98,14 @@ async function extractTextFromPDF(base64Content: string): Promise<string> {
     // This is a very basic extraction - for production use pdf-parse or similar
     return 'Conteúdo do PDF processado - implementar parser PDF completo';
   } catch (error) {
+    console.error('PDF extraction error:', error);
     return 'Erro ao processar PDF';
   }
 }
 
 async function extractTextFromImage(base64Content: string, openaiApiKey: string): Promise<string> {
   try {
+    console.log('Calling OpenAI Vision API for image processing');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -102,7 +113,7 @@ async function extractTextFromImage(base64Content: string, openaiApiKey: string)
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4-vision-preview',
         messages: [
           {
             role: 'user',
@@ -124,10 +135,17 @@ async function extractTextFromImage(base64Content: string, openaiApiKey: string)
       }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
+    }
+
     const data = await response.json();
+    console.log('OpenAI Vision API response received');
     return data.choices[0].message.content || 'Não foi possível extrair texto da imagem';
   } catch (error) {
     console.error('Error in OCR:', error);
-    return 'Erro ao processar imagem com OCR';
+    throw new Error(`Erro ao processar imagem com OCR: ${error.message}`);
   }
 }

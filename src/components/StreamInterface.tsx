@@ -1,408 +1,234 @@
-
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { supabase } from "@/integrations/supabase/client";
-
-// Properly declare the SpeechRecognition interface
-interface SpeechRecognitionEvent extends Event {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message?: string;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  onresult: (event: SpeechRecognitionEvent) => void;
-  onerror: (event: SpeechRecognitionErrorEvent) => void;
-  onstart: () => void;
-  onend: () => void;
-}
-
-// Extend Window interface for speech recognition
-declare global {
-  interface Window {
-    SpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-    webkitSpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-  }
-}
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 
 interface StreamInterfaceProps {
-  isOpen: boolean;
-  onClose: () => void;
-  knowledgeContext?: string;
+  onStreamStart?: () => void;
+  onStreamEnd?: () => void;
 }
 
-const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceProps) => {
-  const [isConnected, setIsConnected] = useState(false);
+const StreamInterface: React.FC<StreamInterfaceProps> = ({ onStreamStart, onStreamEnd }) => {
   const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [currentMessage, setCurrentMessage] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
-  
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
+  const recognitionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioQueueRef = useRef<Uint8Array[]>([]);
+  const isPlayingRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
-      initializeStream();
+    // Inicializar o reconhecimento de fala
+    if ('webkitSpeechRecognition' in window) {
+      const recognition = new (window as any).webkitSpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'pt-BR';
+
+      recognition.onstart = () => {
+        console.log('Reconhecimento de fala iniciado');
+        setIsListening(true);
+        setConnectionStatus('connected');
+      };
+
+      recognition.onend = () => {
+        console.log('Reconhecimento de fala finalizado');
+        setIsListening(false);
+      };
+
+      recognition.onresult = async (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0].transcript)
+          .join('');
+
+        if (event.results[0].isFinal) {
+          console.log('Texto reconhecido:', transcript);
+          await sendMessage(transcript);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Erro no reconhecimento:', event.error);
+        setError(`Erro no reconhecimento: ${event.error}`);
+        setIsListening(false);
+        setConnectionStatus('disconnected');
+      };
+
+      recognitionRef.current = recognition;
     } else {
-      cleanup();
+      setError('Reconhecimento de fala não suportado neste navegador');
     }
 
-    return () => cleanup();
-  }, [isOpen]);
-
-  const initializeStream = async () => {
-    try {
-      setConnectionStatus('connecting');
-      
-      // Initialize Speech Recognition
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognitionRef.current = new SpeechRecognitionConstructor();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = 'pt-BR';
-
-        recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
-          let finalTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            }
-          }
-          
-          if (finalTranscript.trim()) {
-            sendMessage(finalTranscript.trim());
-          }
-        };
-
-        recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
-          console.error('Speech recognition error:', event.error);
-          setIsListening(false);
-          toast({
-            title: "Erro no reconhecimento de voz",
-            description: "Verifique as permissões do microfone",
-            variant: "destructive",
-          });
-        };
-      } else {
-        throw new Error('Speech recognition não suportado neste navegador');
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
       }
-
-      setIsConnected(true);
-      setConnectionStatus('connected');
-      toast({
-        title: "MAGUS Online",
-        description: "Conexão estabelecida! Você pode começar a falar.",
-      });
-
-    } catch (error) {
-      console.error('Error initializing stream:', error);
-      setConnectionStatus('disconnected');
-      toast({
-        title: "Erro de Inicialização",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
 
   const sendMessage = async (message: string) => {
     try {
-      console.log('Sending message via HTTP:', message);
-      setIsSpeaking(true);
-      setCurrentMessage('');
+      setConnectionStatus('connecting');
+      console.log('Iniciando envio de mensagem:', message);
 
-      // Call Google API via Supabase function
-      const { data, error } = await supabase.functions.invoke('chat-google', {
-        body: {
-          messages: [{ role: 'user', content: message }],
-          knowledgeContext: knowledgeContext || ''
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      setCurrentMessage(data.message);
+      // Obter sessão do Supabase
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (data.message) {
-        await speakTextWithGoogleTTS(data.message);
+      if (sessionError) {
+        console.error('Erro ao obter sessão:', sessionError);
+        throw new Error('Erro ao obter sessão: ' + sessionError.message);
       }
 
-    } catch (error) {
-      console.error('Error sending message:', error);
-      setIsSpeaking(false);
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao processar mensagem",
-        variant: "destructive",
+      if (!session) {
+        console.error('Nenhuma sessão encontrada');
+        throw new Error('Nenhuma sessão encontrada. Por favor, faça login novamente.');
+      }
+
+      console.log('Sessão obtida com sucesso');
+      console.log('Token de acesso:', session.access_token);
+      console.log('Tipo do token:', typeof session.access_token);
+      console.log('Tamanho do token:', session.access_token.length);
+
+      // Enviar mensagem para a função
+      const functionUrl = `https://citcshcehztpbumkvywz.supabase.co/functions/v1/stream-google`;
+      console.log('Enviando mensagem para:', functionUrl);
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+        'x-client-info': 'umind-ai-nexus'
+      };
+
+      console.log('Headers da requisição:', {
+        ...headers,
+        'Authorization': headers.Authorization ? 'Bearer [TOKEN]' : 'ausente',
+        'apikey': headers.apikey ? '[PRESENTE]' : 'ausente'
       });
-    }
-  };
 
-  const speakTextWithGoogleTTS = async (text: string) => {
-    try {
-      // Stop any current audio
-      if (currentAudioRef.current) {
-        currentAudioRef.current.pause();
-        currentAudioRef.current = null;
-      }
+      try {
+        const response = await fetch(functionUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ 
+            message,
+            token: session.access_token
+          })
+        });
 
-      // Call Google Text-to-Speech via Supabase function
-      const { data, error } = await supabase.functions.invoke('text-to-speech-google', {
-        body: {
-          text: text,
-          voice: 'pt-BR-Standard-A', // Brazilian Portuguese voice
-          languageCode: 'pt-BR'
+        console.log('Status da resposta:', response.status);
+        console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()));
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Resposta de erro:', errorText);
+          throw new Error(`Erro na resposta (${response.status}): ${errorText}`);
         }
-      });
 
-      if (error) {
-        console.error('TTS Error:', error);
-        // Fallback to browser speech synthesis
-        fallbackToWebSpeech(text);
-        return;
+        const data = await response.json();
+        console.log('Resposta recebida:', data);
+
+        if (data.type === 'success' && data.response.audio) {
+          // Processar áudio
+          const audioData = new Uint8Array(atob(data.response.audio).split('').map(c => c.charCodeAt(0)));
+          await playAudio(audioData);
+        }
+
+        setConnectionStatus('connected');
+      } catch (error) {
+        console.error('Erro detalhado:', error);
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          throw new Error('Não foi possível conectar ao servidor. Verifique sua conexão com a internet.');
+        }
+        throw error;
       }
-
-      if (data.audioContent) {
-        // Convert base64 to audio and play
-        const audioBlob = base64ToBlob(data.audioContent, 'audio/mp3');
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        const audio = new Audio(audioUrl);
-        currentAudioRef.current = audio;
-        
-        audio.onended = () => {
-          setIsSpeaking(false);
-          URL.revokeObjectURL(audioUrl);
-          currentAudioRef.current = null;
-        };
-        
-        audio.onerror = () => {
-          console.error('Audio playback error');
-          setIsSpeaking(false);
-          URL.revokeObjectURL(audioUrl);
-          currentAudioRef.current = null;
-          // Fallback to browser speech synthesis
-          fallbackToWebSpeech(text);
-        };
-        
-        await audio.play();
-      } else {
-        fallbackToWebSpeech(text);
-      }
-
     } catch (error) {
-      console.error('Error with Google TTS:', error);
-      fallbackToWebSpeech(text);
+      console.error('Erro ao enviar mensagem:', error);
+      setError(error instanceof Error ? error.message : 'Erro desconhecido');
+      setConnectionStatus('disconnected');
+      throw error;
     }
   };
 
-  const fallbackToWebSpeech = (text: string) => {
-    if (window.speechSynthesis) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'pt-BR';
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.onend = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
-    } else {
-      setIsSpeaking(false);
+  const playAudio = async (audioData: Uint8Array) => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+
+      const audioBuffer = await audioContextRef.current.decodeAudioData(audioData.buffer);
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      source.start(0);
+    } catch (error) {
+      console.error('Erro ao reproduzir áudio:', error);
+      setError('Erro ao reproduzir áudio');
     }
   };
 
-  const base64ToBlob = (base64: string, contentType: string) => {
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    return new Blob([byteArray], { type: contentType });
-  };
-
-  const toggleListening = async () => {
+  const toggleListening = () => {
     if (!recognitionRef.current) {
-      toast({
-        title: "Erro",
-        description: "Reconhecimento de voz não disponível",
-        variant: "destructive",
-      });
+      setError('Reconhecimento de fala não inicializado');
       return;
     }
 
-    try {
-      if (isListening) {
-        recognitionRef.current.stop();
-        setIsListening(false);
-      } else {
-        recognitionRef.current.start();
-        setIsListening(true);
-      }
-    } catch (error) {
-      console.error('Error toggling speech recognition:', error);
-      setIsListening(false);
-      toast({
-        title: "Erro no microfone",
-        description: "Verifique as permissões do microfone",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const stopSpeaking = () => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
-    }
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    setIsSpeaking(false);
-  };
-
-  const cleanup = () => {
-    if (recognitionRef.current) {
+    if (isListening) {
       recognitionRef.current.stop();
+      setConnectionStatus('disconnected');
+    } else {
+      recognitionRef.current.start();
+      setConnectionStatus('connected');
     }
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current = null;
-    }
-    if (window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    setIsConnected(false);
-    setIsListening(false);
-    setIsSpeaking(false);
-    setConnectionStatus('disconnected');
   };
-
-  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <Card className={`bg-zinc-900 border-zinc-800 ${isMobile ? 'w-full h-full' : 'w-full max-w-md'}`}>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-umind-gray flex items-center space-x-2">
-            <MessageCircle className="w-5 h-5" />
-            <span>MAGUS Stream</span>
-          </CardTitle>
-          <div className="flex items-center space-x-2">
-            <Badge 
-              variant={connectionStatus === 'connected' ? 'default' : 'secondary'}
-              className={connectionStatus === 'connected' ? 'bg-green-600' : 'bg-gray-600'}
-            >
-              {connectionStatus === 'connected' ? 'Online' : 
-               connectionStatus === 'connecting' ? 'Conectando...' : 'Offline'}
-            </Badge>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </CardHeader>
+    <div className="flex flex-col items-center justify-center p-4">
+      <div className="relative">
+        <button
+          onClick={toggleListening}
+          disabled={isProcessing}
+          className={`
+            w-16 h-16 rounded-full flex items-center justify-center
+            transition-all duration-300 ease-in-out
+            ${isListening 
+              ? 'bg-red-500 hover:bg-red-600' 
+              : 'bg-blue-500 hover:bg-blue-600'
+            }
+            ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+            shadow-lg hover:shadow-xl
+          `}
+        >
+          <div className={`
+            w-8 h-8 rounded-full
+            ${isListening ? 'bg-white animate-pulse' : 'bg-white'}
+          `} />
+        </button>
         
-        <CardContent className="space-y-6">
-          {/* Status Indicators */}
-          <div className="flex justify-center space-x-4">
-            <div className={`flex items-center space-x-2 p-2 rounded-lg ${isListening ? 'bg-blue-600/20' : 'bg-zinc-800'}`}>
-              <Mic className={`w-4 h-4 ${isListening ? 'text-blue-400' : 'text-umind-gray/60'}`} />
-              <span className={`text-sm ${isListening ? 'text-blue-400' : 'text-umind-gray/60'}`}>
-                Escutando
-              </span>
-            </div>
-            
-            <div className={`flex items-center space-x-2 p-2 rounded-lg ${isSpeaking ? 'bg-green-600/20' : 'bg-zinc-800'}`}>
-              <Volume2 className={`w-4 h-4 ${isSpeaking ? 'text-green-400' : 'text-umind-gray/60'}`} />
-              <span className={`text-sm ${isSpeaking ? 'text-green-400' : 'text-umind-gray/60'}`}>
-                Falando
-              </span>
-            </div>
+        {isProcessing && (
+          <div className="absolute -top-2 -right-2 w-4 h-4">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent" />
           </div>
+        )}
+      </div>
 
-          {/* Current Message */}
-          {currentMessage && (
-            <div className="bg-zinc-800 rounded-lg p-4 min-h-[100px]">
-              <p className="text-umind-gray text-sm leading-relaxed">
-                {currentMessage}
-              </p>
-            </div>
-          )}
-
-          {/* Controls */}
-          <div className="flex justify-center space-x-4">
-            <Button
-              onClick={toggleListening}
-              disabled={!isConnected}
-              className={`
-                ${isListening 
-                  ? 'bg-red-600 hover:bg-red-700' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-                }
-                ${isMobile ? 'h-14 w-14' : 'h-12 w-12'}
-                rounded-full p-0
-              `}
-            >
-              {isListening ? (
-                <MicOff className="w-6 h-6" />
-              ) : (
-                <Mic className="w-6 h-6" />
-              )}
-            </Button>
-
-            <Button
-              onClick={stopSpeaking}
-              disabled={!isSpeaking}
-              variant="outline"
-              className={`
-                border-zinc-700 text-umind-gray hover:bg-zinc-800
-                ${isMobile ? 'h-14 w-14' : 'h-12 w-12'}
-                rounded-full p-0
-              `}
-            >
-              <VolumeX className="w-6 h-6" />
-            </Button>
-          </div>
-
-          {/* Instructions */}
-          <div className="text-center space-y-2">
-            <p className="text-umind-gray/70 text-sm">
-              {isConnected 
-                ? 'Clique no microfone e comece a falar com MAGUS'
-                : 'Conectando ao MAGUS...'
-              }
-            </p>
-            {knowledgeContext && (
-              <Badge variant="secondary" className="bg-umind-purple/20 text-umind-purple">
-                Com contexto de conhecimento
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="mt-4 text-center">
+        <p className="text-sm text-gray-600">
+          {isListening ? 'Ouvindo...' : 'Clique para falar'}
+        </p>
+        {error && (
+          <p className="text-sm text-red-500 mt-2">
+            {error}
+          </p>
+        )}
+        <p className="text-xs text-gray-500 mt-1">
+          Status: {connectionStatus === 'connected' ? 'Conectado' : 
+                  connectionStatus === 'connecting' ? 'Conectando...' : 
+                  'Desconectado'}
+        </p>
+      </div>
     </div>
   );
 };
