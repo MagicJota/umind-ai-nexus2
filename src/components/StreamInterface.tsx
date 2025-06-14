@@ -112,76 +112,14 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
       // Initialize Speech Synthesis
       synthRef.current = window.speechSynthesis;
 
-      // Connect to WebSocket - URL corrigida
-      const wsUrl = `wss://citcshcehztpbumkvywz.functions.supabase.co/stream-google`;
-      console.log('Connecting to WebSocket:', wsUrl);
-      wsRef.current = new WebSocket(wsUrl);
-
-      wsRef.current.onopen = () => {
-        console.log('WebSocket connected successfully');
-        setIsConnected(true);
-        setConnectionStatus('connected');
-        toast({
-          title: "MAGUS Online",
-          description: "Conexão estabelecida! Você pode começar a falar.",
-        });
-      };
-
-      wsRef.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('Received WebSocket message:', data);
-
-          switch (data.type) {
-            case 'connection_established':
-              console.log('Connection established:', data.message);
-              break;
-            case 'stream_start':
-              setIsSpeaking(true);
-              setCurrentMessage('');
-              break;
-            case 'stream_chunk':
-              setCurrentMessage(data.fullResponse || data.chunk);
-              break;
-            case 'stream_complete':
-              setIsSpeaking(false);
-              setCurrentMessage(data.fullResponse);
-              if (data.fullResponse) {
-                speakText(data.fullResponse);
-              }
-              break;
-            case 'error':
-              console.error('Stream error:', data.message);
-              toast({
-                title: "Erro",
-                description: data.message,
-                variant: "destructive",
-              });
-              setIsSpeaking(false);
-              break;
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setConnectionStatus('disconnected');
-        toast({
-          title: "Erro de Conexão",
-          description: "Não foi possível conectar ao MAGUS",
-          variant: "destructive",
-        });
-      };
-
-      wsRef.current.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason);
-        setIsConnected(false);
-        setConnectionStatus('disconnected');
-        setIsListening(false);
-        setIsSpeaking(false);
-      };
+      // Use HTTP-based streaming instead of direct WebSocket
+      console.log('Initializing HTTP-based streaming...');
+      setIsConnected(true);
+      setConnectionStatus('connected');
+      toast({
+        title: "MAGUS Online",
+        description: "Conexão estabelecida! Você pode começar a falar.",
+      });
 
     } catch (error) {
       console.error('Error initializing stream:', error);
@@ -194,19 +132,37 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
     }
   };
 
-  const sendMessage = (message: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log('Sending message:', message);
-      wsRef.current.send(JSON.stringify({
-        type: 'chat_message',
-        message,
-        knowledgeContext
-      }));
-    } else {
-      console.error('WebSocket not ready, state:', wsRef.current?.readyState);
+  const sendMessage = async (message: string) => {
+    try {
+      console.log('Sending message via HTTP:', message);
+      setIsSpeaking(true);
+      setCurrentMessage('');
+
+      // Call Google API via Supabase function
+      const { data, error } = await supabase.functions.invoke('chat-google', {
+        body: {
+          messages: [{ role: 'user', content: message }],
+          knowledgeContext: knowledgeContext || ''
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setCurrentMessage(data.message);
+      setIsSpeaking(false);
+      
+      if (data.message) {
+        speakText(data.message);
+      }
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setIsSpeaking(false);
       toast({
         title: "Erro",
-        description: "Conexão não estabelecida",
+        description: error.message || "Erro ao processar mensagem",
         variant: "destructive",
       });
     }

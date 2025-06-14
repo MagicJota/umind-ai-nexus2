@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +14,8 @@ import VoiceRecorder from "@/components/VoiceRecorder";
 import AISelector, { AIProvider } from "@/components/AISelector";
 import StreamButton from "@/components/StreamButton";
 import StreamInterface from "@/components/StreamInterface";
-import ThemeToggle from "@/components/ThemeToggle";
-import ShortcutsHelp from "@/components/ShortcutsHelp";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { ShortcutsHelp } from "@/components/ShortcutsHelp";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 interface Message {
