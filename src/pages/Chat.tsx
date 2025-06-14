@@ -13,6 +13,9 @@ import VoiceRecorder from "@/components/VoiceRecorder";
 import AISelector, { AIProvider } from "@/components/AISelector";
 import StreamButton from "@/components/StreamButton";
 import StreamInterface from "@/components/StreamInterface";
+import ThemeToggle from "@/components/ThemeToggle";
+import ShortcutsHelp from "@/components/ShortcutsHelp";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 interface Message {
   id: string;
@@ -44,6 +47,7 @@ const Chat = () => {
   const [knowledgeContext, setKnowledgeContext] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll para a última mensagem
   useEffect(() => {
@@ -254,8 +258,42 @@ const Chat = () => {
     setIsStreamOpen(!isStreamOpen);
   };
 
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    {
+      key: 'Enter',
+      ctrlKey: true,
+      callback: handleSendMessage,
+      description: 'Enviar mensagem'
+    },
+    {
+      key: 'k',
+      ctrlKey: true,
+      callback: () => inputRef.current?.focus(),
+      description: 'Focar no input'
+    },
+    {
+      key: 'n',
+      ctrlKey: true,
+      callback: () => {
+        setMessages([
+          {
+            id: "1",
+            content: "Olá! Sou MAGUS, uma inteligência artificial avançada. Como posso ajudá-lo hoje?",
+            role: "assistant",
+            timestamp: new Date(),
+            provider: "system"
+          },
+        ]);
+        setInputValue("");
+        setSelectedFiles([]);
+      },
+      description: 'Nova conversa'
+    }
+  ]);
+
   return (
-    <div className="h-screen bg-umind-black flex w-full">
+    <div className="h-screen bg-umind-black flex w-full transition-colors duration-300">
       {/* Mobile Sidebar with Sheet */}
       {isMobile ? (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
@@ -278,7 +316,7 @@ const Chat = () => {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="h-14 md:h-16 border-b border-zinc-800 flex items-center px-4 md:px-6">
+        <div className="h-14 md:h-16 border-b border-zinc-800 flex items-center px-4 md:px-6 transition-colors duration-300">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center space-x-3">
               {/* Mobile hamburger menu */}
@@ -288,7 +326,7 @@ const Chat = () => {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="md:hidden text-umind-gray hover:bg-zinc-800"
+                      className="md:hidden text-umind-gray hover:bg-zinc-800 transition-colors"
                     >
                       <Menu className="w-5 h-5" />
                     </Button>
@@ -307,8 +345,10 @@ const Chat = () => {
               </div>
             </div>
 
-            {/* AI Selector */}
-            <div className="flex items-center space-x-3">
+            {/* Controls */}
+            <div className="flex items-center space-x-2">
+              <ThemeToggle />
+              <ShortcutsHelp />
               <AISelector 
                 selectedAI={selectedAI}
                 onAIChange={setSelectedAI}
@@ -321,10 +361,12 @@ const Chat = () => {
         <ScrollArea className="flex-1 p-3 md:p-6">
           <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
             {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+              <div key={message.id} className="animate-fade-in">
+                <ChatMessage message={message} />
+              </div>
             ))}
             {isLoading && (
-              <div className="flex justify-start">
+              <div className="flex justify-start animate-fade-in">
                 <div className="bg-zinc-800 rounded-2xl px-3 md:px-4 py-2 md:py-3 max-w-xs">
                   <div className="flex space-x-1">
                     <div className="w-2 h-2 bg-umind-gray/60 rounded-full animate-pulse"></div>
@@ -339,7 +381,7 @@ const Chat = () => {
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="border-t border-zinc-800 p-3 md:p-4 pb-safe">
+        <div className="border-t border-zinc-800 p-3 md:p-4 pb-safe transition-colors duration-300">
           <div className="max-w-3xl mx-auto space-y-3 md:space-y-4">
             {/* File Upload */}
             <FileUpload
@@ -351,11 +393,12 @@ const Chat = () => {
             {/* Message Input */}
             <div className="flex space-x-2 md:space-x-3">
               <Input
+                ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Digite sua mensagem..."
-                className="flex-1 bg-zinc-900 border-zinc-700 text-umind-gray placeholder:text-umind-gray/60 h-11 md:h-10 text-base md:text-sm"
+                placeholder="Digite sua mensagem... (Ctrl+Enter para enviar)"
+                className="flex-1 bg-zinc-900 border-zinc-700 text-umind-gray placeholder:text-umind-gray/60 h-11 md:h-10 text-base md:text-sm transition-all focus:ring-2 focus:ring-umind-purple/50"
                 disabled={isLoading}
               />
               <VoiceRecorder
@@ -370,7 +413,7 @@ const Chat = () => {
               <Button
                 onClick={handleSendMessage}
                 disabled={isLoading || (!inputValue.trim() && selectedFiles.length === 0)}
-                className="bg-umind-gradient hover:opacity-90 transition-opacity h-11 md:h-10 px-4 md:px-6"
+                className="bg-umind-gradient hover:opacity-90 transition-all hover:scale-105 h-11 md:h-10 px-4 md:px-6"
               >
                 Enviar
               </Button>
@@ -379,7 +422,7 @@ const Chat = () => {
         </div>
       </div>
 
-      {/* Stream Interface - usa automaticamente Google e passa o contexto completo */}
+      {/* Stream Interface */}
       <StreamInterface
         isOpen={isStreamOpen}
         onClose={() => setIsStreamOpen(false)}

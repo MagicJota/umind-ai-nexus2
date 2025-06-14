@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { ThemeProvider } from "@/hooks/useTheme";
 import Index from "./pages/Index";
 import Chat from "./pages/Chat";
 import Login from "./pages/Login";
@@ -20,7 +21,7 @@ function AppRoutes() {
   if (loading) {
     return (
       <div className="min-h-screen bg-umind-black flex items-center justify-center">
-        <div className="text-umind-gray">Carregando...</div>
+        <div className="text-umind-gray animate-pulse">Carregando...</div>
       </div>
     );
   }
@@ -53,15 +54,17 @@ function AppRoutes() {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="umind-ui-theme">
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </TooltipProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };
