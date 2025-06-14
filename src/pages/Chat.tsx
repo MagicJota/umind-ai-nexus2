@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 import ChatSidebar from "@/components/ChatSidebar";
 import ChatMessage from "@/components/ChatMessage";
 import FileUpload from "@/components/FileUpload";
@@ -276,33 +278,15 @@ const Chat = () => {
               </div>
             </div>
 
-            {/* AI Selector and Stream Button */}
+            {/* AI Selector */}
             <div className="flex items-center space-x-3">
-              {!isMobile && (
-                <AISelector 
-                  selectedAI={selectedAI}
-                  onAIChange={setSelectedAI}
-                />
-              )}
-              
-              <StreamButton
-                onStreamToggle={() => setIsStreamOpen(!isStreamOpen)}
-                isStreaming={isStreamOpen}
-                disabled={isLoading}
+              <AISelector 
+                selectedAI={selectedAI}
+                onAIChange={setSelectedAI}
               />
             </div>
           </div>
         </div>
-
-        {/* Mobile AI Selector */}
-        {isMobile && (
-          <div className="p-3 border-b border-zinc-800">
-            <AISelector 
-              selectedAI={selectedAI}
-              onAIChange={setSelectedAI}
-            />
-          </div>
-        )}
 
         {/* Messages Area */}
         <ScrollArea className="flex-1 p-3 md:p-6">
@@ -346,6 +330,11 @@ const Chat = () => {
               />
               <VoiceRecorder
                 onVoiceMessage={handleVoiceMessage}
+                disabled={isLoading}
+              />
+              <StreamButton
+                onStreamToggle={() => setIsStreamOpen(!isStreamOpen)}
+                isStreaming={isStreamOpen}
                 disabled={isLoading}
               />
               <Button

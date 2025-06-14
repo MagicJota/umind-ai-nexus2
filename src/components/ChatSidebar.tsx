@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Search, Plus } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { FileText, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 
 interface Conversation {
   id: string;
@@ -82,7 +84,7 @@ const ChatSidebar = ({ onClose, activeKnowledgeBases = [], onKnowledgeBasesChang
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     fetchKnowledgeBases();
   }, []);
 

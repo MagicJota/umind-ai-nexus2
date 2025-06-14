@@ -7,6 +7,14 @@ import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+// Extend Window interface for speech recognition
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
 interface StreamInterfaceProps {
   isOpen: boolean;
   onClose: () => void;

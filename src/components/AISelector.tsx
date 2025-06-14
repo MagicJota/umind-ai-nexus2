@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Zap, Brain } from "lucide-react";
+import { Bot, Zap, Brain, ChevronDown } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export type AIProvider = 'openai' | 'claude' | 'google';
@@ -46,82 +46,47 @@ const AISelector = ({ selectedAI, onAIChange }: AISelectorProps) => {
 
   const selectedOption = aiOptions.find(ai => ai.id === selectedAI);
 
-  if (isMobile) {
-    return (
-      <div className="w-full">
-        <Button
-          variant="outline"
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full justify-between bg-zinc-900 border-zinc-700 text-umind-gray"
-        >
-          <div className="flex items-center space-x-2">
-            {selectedOption && <selectedOption.icon className="w-4 h-4" />}
-            <span>{selectedOption?.name}</span>
-            <Badge variant="secondary" className={`text-xs ${selectedOption?.color} text-white`}>
-              {selectedOption?.badge}
-            </Badge>
-          </div>
-        </Button>
-        
-        {isOpen && (
-          <div className="mt-2 space-y-2">
-            {aiOptions.map((ai) => (
-              <Card 
-                key={ai.id}
-                className={`cursor-pointer transition-colors ${
-                  selectedAI === ai.id 
-                    ? 'bg-zinc-800 border-umind-purple' 
-                    : 'bg-zinc-900 border-zinc-700 hover:bg-zinc-800'
-                }`}
-                onClick={() => {
-                  onAIChange(ai.id);
-                  setIsOpen(false);
-                }}
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-center space-x-3">
-                    <ai.icon className="w-5 h-5 text-umind-gray" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2">
-                        <h3 className="font-medium text-umind-gray">{ai.name}</h3>
-                        <Badge variant="secondary" className={`text-xs ${ai.color} text-white`}>
-                          {ai.badge}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-umind-gray/70 truncate">{ai.description}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex space-x-2">
-      {aiOptions.map((ai) => (
-        <Button
-          key={ai.id}
-          variant={selectedAI === ai.id ? "default" : "outline"}
-          size="sm"
-          onClick={() => onAIChange(ai.id)}
-          className={`
-            ${selectedAI === ai.id 
-              ? 'bg-umind-gradient text-white' 
-              : 'bg-zinc-900 border-zinc-700 text-umind-gray hover:bg-zinc-800'
-            }
-          `}
-        >
-          <ai.icon className="w-4 h-4 mr-2" />
-          <span>{ai.name}</span>
-          <Badge variant="secondary" className={`ml-2 text-xs ${ai.color} text-white`}>
-            {ai.badge}
-          </Badge>
-        </Button>
-      ))}
+    <div className="relative">
+      <Button
+        variant="outline"
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-zinc-900 border-zinc-700 text-umind-gray hover:bg-zinc-800 flex items-center space-x-2"
+      >
+        {selectedOption && <selectedOption.icon className="w-4 h-4" />}
+        <span>{selectedOption?.name}</span>
+        <ChevronDown className="w-4 h-4" />
+      </Button>
+      
+      {isOpen && (
+        <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg">
+          {aiOptions.map((ai) => (
+            <div
+              key={ai.id}
+              className={`p-3 cursor-pointer transition-colors hover:bg-zinc-800 ${
+                selectedAI === ai.id ? 'bg-zinc-800' : ''
+              }`}
+              onClick={() => {
+                onAIChange(ai.id);
+                setIsOpen(false);
+              }}
+            >
+              <div className="flex items-center space-x-3">
+                <ai.icon className="w-4 h-4 text-umind-gray" />
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-umind-gray">{ai.name}</span>
+                    <Badge variant="secondary" className={`text-xs ${ai.color} text-white`}>
+                      {ai.badge}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-umind-gray/70">{ai.description}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
