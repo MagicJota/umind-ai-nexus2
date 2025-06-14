@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -100,17 +99,26 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
         recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
           console.error('Speech recognition error:', event.error);
           setIsListening(false);
+          toast({
+            title: "Erro no reconhecimento de voz",
+            description: "Verifique as permissões do microfone",
+            variant: "destructive",
+          });
         };
+      } else {
+        throw new Error('Speech recognition não suportado neste navegador');
       }
 
       // Initialize Speech Synthesis
       synthRef.current = window.speechSynthesis;
 
-      // Connect to WebSocket
+      // Connect to WebSocket - URL corrigida
       const wsUrl = `wss://citcshcehztpbumkvywz.functions.supabase.co/stream-google`;
+      console.log('Connecting to WebSocket:', wsUrl);
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
+        console.log('WebSocket connected successfully');
         setIsConnected(true);
         setConnectionStatus('connected');
         toast({
@@ -120,28 +128,40 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
       };
 
       wsRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log('Received:', data);
+        try {
+          const data = JSON.parse(event.data);
+          console.log('Received WebSocket message:', data);
 
-        switch (data.type) {
-          case 'stream_start':
-            setIsSpeaking(true);
-            break;
-          case 'stream_chunk':
-            setCurrentMessage(data.fullResponse || data.chunk);
-            break;
-          case 'stream_complete':
-            setIsSpeaking(false);
-            setCurrentMessage(data.fullResponse);
-            speakText(data.fullResponse);
-            break;
-          case 'error':
-            toast({
-              title: "Erro",
-              description: data.message,
-              variant: "destructive",
-            });
-            break;
+          switch (data.type) {
+            case 'connection_established':
+              console.log('Connection established:', data.message);
+              break;
+            case 'stream_start':
+              setIsSpeaking(true);
+              setCurrentMessage('');
+              break;
+            case 'stream_chunk':
+              setCurrentMessage(data.fullResponse || data.chunk);
+              break;
+            case 'stream_complete':
+              setIsSpeaking(false);
+              setCurrentMessage(data.fullResponse);
+              if (data.fullResponse) {
+                speakText(data.fullResponse);
+              }
+              break;
+            case 'error':
+              console.error('Stream error:', data.message);
+              toast({
+                title: "Erro",
+                description: data.message,
+                variant: "destructive",
+              });
+              setIsSpeaking(false);
+              break;
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
         }
       };
 
@@ -155,37 +175,69 @@ const StreamInterface = ({ isOpen, onClose, knowledgeContext }: StreamInterfaceP
         });
       };
 
-      wsRef.current.onclose = () => {
+      wsRef.current.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
         setConnectionStatus('disconnected');
         setIsListening(false);
+        setIsSpeaking(false);
       };
 
     } catch (error) {
       console.error('Error initializing stream:', error);
       setConnectionStatus('disconnected');
+      toast({
+        title: "Erro de Inicialização",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
   const sendMessage = (message: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log('Sending message:', message);
       wsRef.current.send(JSON.stringify({
         type: 'chat_message',
         message,
         knowledgeContext
       }));
+    } else {
+      console.error('WebSocket not ready, state:', wsRef.current?.readyState);
+      toast({
+        title: "Erro",
+        description: "Conexão não estabelecida",
+        variant: "destructive",
+      });
     }
   };
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) return;
+  const toggleListening = async () => {
+    if (!recognitionRef.current) {
+      toast({
+        title: "Erro",
+        description: "Reconhecimento de voz não disponível",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    if (isListening) {
-      recognitionRef.current.stop();
+    try {
+      if (isListening) {
+        recognitionRef.current.stop();
+        setIsListening(false);
+      } else {
+        recognitionRef.current.start();
+        setIsListening(true);
+      }
+    } catch (error) {
+      console.error('Error toggling speech recognition:', error);
       setIsListening(false);
-    } else {
-      recognitionRef.current.start();
-      setIsListening(true);
+      toast({
+        title: "Erro no microfone",
+        description: "Verifique as permissões do microfone",
+        variant: "destructive",
+      });
     }
   };
 

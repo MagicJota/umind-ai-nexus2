@@ -14,10 +14,17 @@ serve(async (req) => {
 
   try {
     const { messages, knowledgeContext } = await req.json();
+    console.log('Google Request:', { messagesCount: messages?.length, hasContext: !!knowledgeContext });
+    
     const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
     
     if (!googleApiKey) {
+      console.error('Google API key not configured');
       throw new Error('Google API key not configured');
+    }
+
+    if (!messages || !Array.isArray(messages)) {
+      throw new Error('Messages array is required');
     }
 
     // Convert messages to Google format
@@ -27,12 +34,13 @@ serve(async (req) => {
     }));
 
     // Add system instruction through the first message
-    const systemPrompt = `Você é MAGUS, um assistente AI inteligente da UMIND SALES. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
+    const systemPrompt = `Você é MAGUS, um assistente AI inteligente da UMIND SALES. Seja natural, direto e útil. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
     
     if (contents.length > 0) {
       contents[0].parts[0].text = `${systemPrompt}\n\nUsuário: ${contents[0].parts[0].text}`;
     }
 
+    console.log('Calling Google API...');
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`, {
       method: 'POST',
       headers: {
@@ -48,23 +56,29 @@ serve(async (req) => {
     });
 
     const data = await response.json();
+    console.log('Google Response status:', response.status);
     
     if (!response.ok) {
+      console.error('Google API error:', data);
       throw new Error(data.error?.message || 'Google API error');
     }
 
-    return new Response(JSON.stringify({
+    const result = {
       message: data.candidates[0].content.parts[0].text,
       model: 'gemini-1.5-flash',
       provider: 'google'
-    }), {
+    };
+
+    console.log('Returning successful response');
+    return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Error in chat-google:', error);
     return new Response(JSON.stringify({ 
-      error: error.message || 'Internal server error' 
+      error: error.message || 'Internal server error',
+      provider: 'google'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

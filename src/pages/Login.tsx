@@ -1,239 +1,149 @@
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [company, setCompany] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
+  
+  const { signIn, signUp, user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const { signIn, signUp, user, loading } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
-      navigate("/chat");
+      navigate('/chat');
     }
   }, [user, navigate]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-umind-black flex items-center justify-center">
-        <div className="text-umind-gray">Carregando...</div>
-      </div>
-    );
-  }
-
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
+    setLoading(true);
 
-    const { error } = await signIn(email, password);
-    
-    setIsLoading(false);
-    
-    if (error) {
+    try {
+      if (isSignUp) {
+        const { error } = await signUp(email, password, fullName, company);
+        if (error) {
+          toast({
+            title: "Erro no cadastro",
+            description: error.message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Cadastro realizado!",
+            description: "Verifique seu email para confirmar a conta.",
+          });
+        }
+      } else {
+        const { error } = await signIn(email, password);
+        if (error) {
+          toast({
+            title: "Erro no login",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
       toast({
-        title: "Erro no login",
-        description: error.message,
+        title: "Erro",
+        description: "Algo deu errado. Tente novamente.",
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Redirecionando para o chat...",
-      });
-      navigate("/chat");
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const fullName = formData.get("fullName") as string;
-    const company = formData.get("company") as string;
-
-    const { error } = await signUp(email, password, fullName, company);
-    
-    setIsLoading(false);
-    
-    if (error) {
-      if (error.message.includes('already registered')) {
-        toast({
-          title: "Usuário já existe",
-          description: "Este email já está registrado. Tente fazer login.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Erro no registro",
-          description: error.message,
-          variant: "destructive",
-        });
-      }
-    } else {
-      toast({
-        title: "Registro realizado!",
-        description: "Verifique seu email para confirmar a conta.",
-      });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-umind-black flex flex-col">
-      {/* Header with UMIND Logo */}
-      <div className="absolute top-6 left-6 z-10">
-        <div className="flex items-center space-x-3">
-          <img 
-            src="/lovable-uploads/1988c68c-7e04-415b-8f30-609f18924a6c.png" 
-            alt="UMIND" 
-            className="w-12 h-12"
-          />
-          <div>
-            <h1 className="text-xl font-medium text-umind-gray">UMIND</h1>
-            <p className="text-sm text-umind-gray/70">SALES</p>
+    <div className="min-h-screen bg-umind-black flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-zinc-900 border-zinc-800">
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/lovable-uploads/1988c68c-7e04-415b-8f30-609f18924a6c.png" 
+              alt="UMIND" 
+              className="w-12 h-12"
+            />
           </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md animate-fade-in">
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8 bg-zinc-900">
-              <TabsTrigger value="login" className="data-[state=active]:bg-umind-gradient">
-                Entrar
-              </TabsTrigger>
-              <TabsTrigger value="register" className="data-[state=active]:bg-umind-gradient">
-                Registrar
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="login">
-              <Card className="bg-zinc-900/50 border-zinc-800">
-                <CardHeader className="text-center">
-                  <CardTitle className="text-2xl text-umind-gray">Bem-vindo de volta</CardTitle>
-                  <CardDescription className="text-umind-gray/70">
-                    Entre com suas credenciais para acessar o assistente AI
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-umind-gray">Email</Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        required
-                        className="bg-zinc-800 border-zinc-700 text-umind-gray"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="password" className="text-umind-gray">Senha</Label>
-                      <Input
-                        id="password"
-                        name="password"
-                        type="password"
-                        required
-                        className="bg-zinc-800 border-zinc-700 text-umind-gray"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full bg-umind-gradient hover:opacity-90 transition-opacity"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Entrando..." : "Entrar"}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="register">
-              <Card className="bg-zinc-900/50 border-zinc-800">
-                <CardHeader className="text-center">
-                  <CardTitle className="text-2xl text-umind-gray">Criar conta</CardTitle>
-                  <CardDescription className="text-umind-gray/70">
-                    Crie sua conta para acessar o assistente AI
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleRegister} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName" className="text-umind-gray">Nome completo</Label>
-                      <Input
-                        id="fullName"
-                        name="fullName"
-                        type="text"
-                        placeholder="Seu nome completo"
-                        required
-                        className="bg-zinc-800 border-zinc-700 text-umind-gray"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="registerEmail" className="text-umind-gray">Email</Label>
-                      <Input
-                        id="registerEmail"
-                        name="email"
-                        type="email"
-                        placeholder="seu@email.com"
-                        required
-                        className="bg-zinc-800 border-zinc-700 text-umind-gray"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="registerPassword" className="text-umind-gray">Senha</Label>
-                      <Input
-                        id="registerPassword"
-                        name="password"
-                        type="password"
-                        placeholder="Mínimo 6 caracteres"
-                        required
-                        className="bg-zinc-800 border-zinc-700 text-umind-gray"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="company" className="text-umind-gray">Empresa (opcional)</Label>
-                      <Input
-                        id="company"
-                        name="company"
-                        type="text"
-                        placeholder="Nome da sua empresa"
-                        className="bg-zinc-800 border-zinc-700 text-umind-gray"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full bg-umind-gradient hover:opacity-90 transition-opacity"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Criando conta..." : "Criar conta"}
-                    </Button>
-                  </form>
-                  <p className="text-xs text-umind-gray/60 mt-4 text-center">
-                    Você receberá um email de confirmação
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
+          <CardTitle className="text-2xl font-bold text-umind-gray">
+            {isSignUp ? 'Criar Conta' : 'Login'}
+          </CardTitle>
+          <p className="text-umind-gray/60">
+            {isSignUp ? 'Crie sua conta para usar o MAGUS' : 'Entre para acessar o MAGUS AI'}
+          </p>
+        </CardHeader>
+        
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <>
+                <Input
+                  type="text"
+                  placeholder="Nome completo"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="bg-zinc-800 border-zinc-700 text-umind-gray"
+                  required
+                />
+                <Input
+                  type="text"
+                  placeholder="Empresa (opcional)"
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  className="bg-zinc-800 border-zinc-700 text-umind-gray"
+                />
+              </>
+            )}
+            
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="bg-zinc-800 border-zinc-700 text-umind-gray"
+              required
+            />
+            
+            <Input
+              type="password"
+              placeholder="Senha"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="bg-zinc-800 border-zinc-700 text-umind-gray"
+              required
+            />
+            
+            <Button 
+              type="submit" 
+              className="w-full bg-umind-gradient hover:opacity-90"
+              disabled={loading}
+            >
+              {loading ? 'Carregando...' : (isSignUp ? 'Criar Conta' : 'Entrar')}
+            </Button>
+          </form>
+          
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-umind-purple hover:underline"
+            >
+              {isSignUp ? 'Já tem conta? Faça login' : 'Não tem conta? Crie uma'}
+            </button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

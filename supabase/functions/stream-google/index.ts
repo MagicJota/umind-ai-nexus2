@@ -13,6 +13,7 @@ serve(async (req) => {
   const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
 
   if (!googleApiKey) {
+    console.error("Google API key not configured");
     socket.close(1000, "Google API key not configured");
     return response;
   }
@@ -33,8 +34,14 @@ serve(async (req) => {
       if (data.type === 'chat_message') {
         const { message, knowledgeContext } = data;
         
+        if (!message) {
+          throw new Error('Message is required');
+        }
+        
         // Prepare system prompt
         const systemPrompt = `Você é MAGUS, um assistente AI inteligente da UMIND SALES que conversa ao vivo com o usuário. Seja natural, direto e útil. ${knowledgeContext ? `Contexto adicional: ${knowledgeContext}` : ''}`;
+
+        console.log('Calling Google Streaming API...');
 
         // Call Google API with streaming
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${googleApiKey}`, {
@@ -55,6 +62,8 @@ serve(async (req) => {
         });
 
         if (!response.ok) {
+          const errorData = await response.text();
+          console.error('Google API error:', errorData);
           throw new Error('Google API error');
         }
 
@@ -68,32 +77,36 @@ serve(async (req) => {
 
           let fullResponse = '';
           
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-            const chunk = new TextDecoder().decode(value);
-            const lines = chunk.split('\n').filter(line => line.trim());
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                try {
-                  const jsonData = JSON.parse(line.slice(6));
-                  if (jsonData.candidates && jsonData.candidates[0].content) {
-                    const text = jsonData.candidates[0].content.parts[0].text;
-                    fullResponse += text;
-                    
-                    socket.send(JSON.stringify({
-                      type: 'stream_chunk',
-                      chunk: text,
-                      fullResponse
-                    }));
+              const chunk = new TextDecoder().decode(value);
+              const lines = chunk.split('\n').filter(line => line.trim());
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const jsonData = JSON.parse(line.slice(6));
+                    if (jsonData.candidates && jsonData.candidates[0]?.content?.parts?.[0]?.text) {
+                      const text = jsonData.candidates[0].content.parts[0].text;
+                      fullResponse += text;
+                      
+                      socket.send(JSON.stringify({
+                        type: 'stream_chunk',
+                        chunk: text,
+                        fullResponse
+                      }));
+                    }
+                  } catch (parseError) {
+                    console.error('Error parsing chunk:', parseError);
                   }
-                } catch (parseError) {
-                  console.error('Error parsing chunk:', parseError);
                 }
               }
             }
+          } finally {
+            reader.releaseLock();
           }
 
           socket.send(JSON.stringify({
@@ -107,7 +120,7 @@ serve(async (req) => {
       console.error('Error in stream processing:', error);
       socket.send(JSON.stringify({
         type: 'error',
-        message: 'Erro ao processar mensagem'
+        message: 'Erro ao processar mensagem: ' + error.message
       }));
     }
   };

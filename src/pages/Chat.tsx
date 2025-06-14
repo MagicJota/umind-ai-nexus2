@@ -122,19 +122,31 @@ const Chat = () => {
 
   const callAIProvider = async (messages: Message[], context: string = '') => {
     const functionName = `chat-${selectedAI}`;
+    console.log(`Calling ${functionName} with context:`, !!context);
     
-    const { data, error } = await supabase.functions.invoke(functionName, {
-      body: {
-        messages: messages.map(m => ({ role: m.role, content: m.content })),
-        knowledgeContext: context
+    try {
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: {
+          messages: messages.map(m => ({ role: m.role, content: m.content })),
+          knowledgeContext: context
+        }
+      });
+
+      if (error) {
+        console.error(`Error calling ${functionName}:`, error);
+        throw new Error(error.message || `Erro na API ${selectedAI}`);
       }
-    });
 
-    if (error) {
-      throw new Error(error.message || 'AI provider error');
+      if (!data) {
+        throw new Error('Resposta vazia da API');
+      }
+
+      console.log(`Response from ${functionName}:`, data);
+      return data;
+    } catch (error) {
+      console.error(`Failed to call ${functionName}:`, error);
+      throw error;
     }
-
-    return data;
   };
 
   const handleSendMessage = async () => {
@@ -175,7 +187,7 @@ const Chat = () => {
                 fileType: file.type,
                 title: `Upload: ${file.name}`,
                 description: `Arquivo enviado pelo usuário: ${file.name}`,
-                userId: 'current-user-id' // This should come from auth
+                userId: 'current-user-id' // TODO: usar auth real
               }
             });
           } catch (error) {
@@ -190,7 +202,7 @@ const Chat = () => {
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: aiResponse.message,
+        content: aiResponse.message || 'Resposta não disponível',
         role: "assistant",
         timestamp: new Date(),
         provider: aiResponse.provider,
@@ -200,14 +212,22 @@ const Chat = () => {
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
-      const errorMessage: Message = {
+      
+      let errorMessage = 'Erro desconhecido';
+      if (error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
-        content: `Erro ao processar mensagem: ${error.message}`,
+        content: `❌ Erro: ${errorMessage}. Por favor, tente novamente.`,
         role: "assistant",
         timestamp: new Date(),
         provider: 'error'
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, errorResponse]);
     } finally {
       setIsLoading(false);
     }
