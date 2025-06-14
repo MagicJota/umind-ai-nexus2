@@ -10,7 +10,7 @@ import Chat from "./pages/Chat";
 import Login from "./pages/Login";
 import GodMode from "./pages/GodMode";
 import NotFound from "./pages/NotFound";
-import ProtectedRoute from "./components/ProtectedRoute";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -40,7 +40,7 @@ function AppRoutes() {
       <Route 
         path="/god-mode" 
         element={
-          <ProtectedRoute adminOnly>
+          <ProtectedRoute requireAdmin>
             <GodMode />
           </ProtectedRoute>
         } 
