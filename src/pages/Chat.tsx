@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +28,7 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Olá! Sou MAGUS, uma inteligência artificial avançada da UMIND SALES. Como posso ajudá-lo hoje? Você pode escolher entre Chat, Think ou Code, ou falar comigo ao vivo usando o modo Stream!",
+      content: "Olá! Sou MAGUS, uma inteligência artificial avançada. Como posso ajudá-lo hoje? Você pode escolher entre Chat, Think ou Code, ou falar comigo ao vivo usando o modo Stream!",
       role: "assistant",
       timestamp: new Date(),
       provider: "system"
@@ -385,7 +384,6 @@ const Chat = () => {
         isOpen={isStreamOpen}
         onClose={() => setIsStreamOpen(false)}
         knowledgeContext={knowledgeContext}
-        messages={messages}
       />
     </div>
   );
