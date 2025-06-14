@@ -1,4 +1,5 @@
 
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -35,7 +36,7 @@ serve(async (req) => {
       content: msg.content
     }));
 
-    console.log('Calling Claude API with model claude-3-5-sonnet-20241022...');
+    console.log('Calling Claude API with model claude-opus-4-20250514...');
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -44,7 +45,7 @@ serve(async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-opus-4-20250514',
         system: systemPrompt,
         messages: claudeMessages,
         max_tokens: 1000,
@@ -78,7 +79,7 @@ serve(async (req) => {
 
     const result = {
       message: data.content[0].text,
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-opus-4-20250514',
       provider: 'claude'
     };
 
@@ -98,3 +99,4 @@ serve(async (req) => {
     });
   }
 });
+
